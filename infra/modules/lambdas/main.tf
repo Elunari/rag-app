@@ -11,8 +11,10 @@ resource "aws_lambda_function" "lambda" {
   runtime         = var.lambda_runtime
   filename        = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
-}
 
-output "lambda_arn" {
-  value = aws_lambda_function.lambda.arn
+  environment {
+    variables = {
+      S3_BUCKET_NAME = var.s3_bucket_name
+    }
+  }
 }
