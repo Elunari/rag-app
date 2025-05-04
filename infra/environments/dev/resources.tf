@@ -65,6 +65,25 @@ resource "aws_iam_role_policy" "lambda_s3_event_policy" {
   })
 }
 
+# IAM policy for Lambda to start Step Function executions
+resource "aws_iam_role_policy" "lambda_step_functions_policy" {
+  name = "lambda_step_functions_policy"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "states:StartExecution"
+        ]
+        Resource = "*"  # We'll restrict this to specific state machines in production
+      }
+    ]
+  })
+}
+
 resource "aws_lambda_permission" "api_gateway_invoke" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
