@@ -42,6 +42,28 @@ resource "aws_iam_role_policy_attachment" "lambda_logs" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+# IAM policy for Lambda to receive S3 events
+resource "aws_iam_role_policy" "lambda_s3_event_policy" {
+  name = "lambda_s3_event_policy"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          "${module.s3.bucket_arn}",
+          "${module.s3.bucket_arn}/*"
+        ]
+      }
+    ]
+  })
+}
 
 resource "aws_lambda_permission" "api_gateway_invoke" {
   statement_id  = "AllowAPIGatewayInvoke"
