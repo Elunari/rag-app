@@ -15,7 +15,8 @@ resource "aws_lambda_function" "queue_processor" {
 
   environment {
     variables = {
-      QUEUE_URL = var.queue_url
+      QUEUE_URL      = var.queue_url
+      SNS_TOPIC_ARN  = var.sns_topic_arn
     }
   }
 }

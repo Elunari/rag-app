@@ -6,6 +6,20 @@ from typing import Dict, Any
 
 sqs = boto3.client('sqs')
 s3 = boto3.client('s3')
+sns = boto3.client('sns')
+
+def send_notification(subject: str, message: str) -> None:
+    """
+    Send a notification to SNS topic.
+    """
+    try:
+        sns.publish(
+            TopicArn=os.environ['SNS_TOPIC_ARN'],
+            Subject=subject,
+            Message=message
+        )
+    except Exception as e:
+        print(f"Error sending notification: {str(e)}")
 
 def process_file(bucket: str, key: str) -> Dict[str, Any]:
     """
@@ -13,6 +27,12 @@ def process_file(bucket: str, key: str) -> Dict[str, Any]:
     This is where your actual file processing logic will go.
     """
     try:
+        # Send start notification
+        send_notification(
+            subject="File Processing Started",
+            message=f"Started processing file: {key}"
+        )
+        
         # Simulate processing delay
         time.sleep(10)
         
@@ -26,12 +46,26 @@ def process_file(bucket: str, key: str) -> Dict[str, Any]:
         file_size = len(content)
         print(f"Processing file: {key}, size: {file_size} bytes")
         
+        # Send success notification
+        send_notification(
+            subject="File Processing Completed",
+            message=f"Successfully processed file: {key} (size: {file_size} bytes)"
+        )
+        
         return {
             'statusCode': 200,
             'body': f'Successfully processed file: {key} (size: {file_size} bytes)'
         }
     except Exception as e:
-        print(f"Error processing file {key}: {str(e)}")
+        error_message = f"Error processing file {key}: {str(e)}"
+        print(error_message)
+        
+        # Send error notification
+        send_notification(
+            subject="File Processing Failed",
+            message=error_message
+        )
+        
         raise
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:

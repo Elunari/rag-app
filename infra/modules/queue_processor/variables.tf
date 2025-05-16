@@ -16,4 +16,9 @@ variable "lambda_role_arn" {
 variable "queue_url" {
   description = "URL of the SQS queue"
   type        = string
+}
+
+variable "sns_topic_arn" {
+  description = "ARN of the SNS topic for notifications"
+  type        = string
 } 

@@ -37,6 +37,15 @@ module "sqs" {
   queue_name = "file-processing-queue-dev"
 }
 
+module "sns" {
+  source = "../../modules/sns"
+  
+  topic_name     = "file-processing-notifications-dev"
+  lambda_role_id = aws_iam_role.lambda_role.id
+  queue_url     = module.sqs.queue_url
+  queue_arn     = module.sqs.queue_arn
+}
+
 module "queue_processor" {
   source = "../../modules/queue_processor"
   
@@ -44,4 +53,5 @@ module "queue_processor" {
   lambda_source_path = "../../../apps/s3-trigger-lambda/queue_processor.py"
   lambda_role_arn    = aws_iam_role.lambda_role.arn
   queue_url          = module.sqs.queue_url
+  sns_topic_arn      = module.sns.topic_arn
 }
