@@ -21,6 +21,7 @@ resource "aws_lambda_function" "lambda" {
   environment {
     variables = {
       S3_BUCKET_NAME = var.s3_bucket_name
+      QUEUE_URL      = var.queue_url
     }
   }
 }

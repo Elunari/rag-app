@@ -20,12 +20,28 @@ module "api_gateway" {
 
 module "s3_trigger_lambda" {
   source = "../../modules/s3_trigger_lambda"
-
-  lambda_name       = "s3-trigger-lambda"
-  lambda_runtime    = "python3.9"
-  lambda_handler    = "lambda_function.lambda_handler"
-  lambda_role_arn   = aws_iam_role.lambda_role.arn
+  
+  lambda_name        = "s3-trigger-lambda-dev"
   lambda_source_path = "../../../apps/s3-trigger-lambda/lambda_function.py"
-  s3_bucket_name    = module.s3.bucket_name
-  s3_bucket_arn     = module.s3.bucket_arn
+  lambda_handler     = "lambda_function.lambda_handler"
+  lambda_runtime     = "python3.9"
+  lambda_role_arn    = aws_iam_role.lambda_role.arn
+  s3_bucket_name     = module.s3.bucket_name
+  s3_bucket_arn      = module.s3.bucket_arn
+  queue_url          = module.sqs.queue_url
+}
+
+module "sqs" {
+  source = "../../modules/sqs"
+  
+  queue_name = "file-processing-queue-dev"
+}
+
+module "queue_processor" {
+  source = "../../modules/queue_processor"
+  
+  lambda_name        = "file-queue-processor-dev"
+  lambda_source_path = "../../../apps/s3-trigger-lambda/queue_processor.py"
+  lambda_role_arn    = aws_iam_role.lambda_role.arn
+  queue_url          = module.sqs.queue_url
 }
