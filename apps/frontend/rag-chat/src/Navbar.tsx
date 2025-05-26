@@ -1,51 +1,47 @@
 import { Link, useLocation } from "react-router-dom";
-import { useTheme } from "@mui/material/styles";
+import { Box, useTheme } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import { useState } from "react";
 
 const NavLink = ({
   to,
   children,
+  isActive,
 }: {
   to: string;
   children: React.ReactNode;
+  isActive: boolean;
 }) => {
-  const location = useLocation();
   const theme = useTheme();
-  const isActive =
-    location.pathname === to ||
-    (to === "/chats" && location.pathname.startsWith("/chats/"));
+  const [isHovered, setIsHovered] = useState(false);
 
   return (
     <Link
       to={to}
       style={{
-        color: theme.palette.primary.main,
         textDecoration: "none",
-        marginRight: "1rem",
-        padding: "0.5rem 0",
+        color: theme.palette.text.primary,
+        opacity: isActive || isHovered ? 1 : 0.7,
+        transition: "opacity 0.2s ease-in-out",
         position: "relative",
-        opacity: isActive ? 1 : 0.8,
-        transition: "all 0.2s ease",
+        padding: "0.5rem 1rem",
       }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.opacity = "1";
-      }}
-      onMouseLeave={(e) => {
-        if (!isActive) {
-          e.currentTarget.style.opacity = "0.8";
-        }
-      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {children}
-      {isActive && (
-        <div
-          style={{
+      {(isActive || isHovered) && (
+        <Box
+          sx={{
             position: "absolute",
             bottom: 0,
             left: 0,
             right: 0,
             height: "2px",
             background: theme.palette.primary.main,
-            transition: "all 0.2s ease",
+            transform: "scaleX(1)",
+            transition: "transform 0.2s ease-in-out",
+            opacity: isActive ? 1 : 0.5,
           }}
         />
       )}
@@ -55,21 +51,41 @@ const NavLink = ({
 
 export const Navbar = () => {
   const theme = useTheme();
+  const location = useLocation();
+
+  const isActive = (path: string) => {
+    if (path === "/chats") {
+      return location.pathname.startsWith("/chat");
+    }
+    return location.pathname === path;
+  };
 
   return (
-    <nav
-      style={{
-        marginBottom: "1rem",
-        padding: "1rem",
-        background: theme.palette.background.paper,
-        borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+    <Box
+      sx={{
         position: "sticky",
         top: 0,
         zIndex: 1000,
+        background: theme.palette.background.paper,
+        borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+        px: 2,
+        py: 1,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
       }}
     >
-      <NavLink to="/">Home</NavLink>
-      <NavLink to="/chats">Chats</NavLink>
-    </nav>
+      <Box sx={{ display: "flex", gap: 4, alignItems: "center" }}>
+        <NavLink to="/" isActive={isActive("/")}>
+          Home
+        </NavLink>
+        <NavLink to="/chats" isActive={isActive("/chats")}>
+          Chats
+        </NavLink>
+        <NavLink to="/add-knowledge" isActive={isActive("/add-knowledge")}>
+          Add Knowledge
+        </NavLink>
+      </Box>
+    </Box>
   );
 };

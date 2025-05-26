@@ -1,9 +1,11 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
-import { Chat } from "./pages/chat/Chat";
 import { Home } from "./pages/home/Home";
 import { Chats } from "./pages/chats/Chats";
+import { Chat } from "./pages/chat/Chat";
+import { NewChat } from "./pages/new-chat/NewChat";
+import { AddKnowledge } from "./pages/add-knowledge/AddKnowledge";
 import { Navbar } from "./Navbar";
 
 const theme = createTheme({
@@ -69,14 +71,16 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Router>
+      <BrowserRouter>
         <Navbar />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/chats" element={<Chats />} />
-          <Route path="/chats/:id" element={<Chat />} />
+          <Route path="/chat/new" element={<NewChat />} />
+          <Route path="/chat/:id" element={<Chat />} />
+          <Route path="/add-knowledge" element={<AddKnowledge />} />
         </Routes>
-      </Router>
+      </BrowserRouter>
     </ThemeProvider>
   );
 }
