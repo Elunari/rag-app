@@ -7,20 +7,24 @@ import {
   Button,
   useTheme,
   CircularProgress,
+  Alert,
 } from "@mui/material";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import DescriptionIcon from "@mui/icons-material/Description";
+import { uploadKnowledge } from "../../services/api";
 
 export const AddKnowledge = () => {
   const theme = useTheme();
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile && selectedFile.type === "application/pdf") {
       setFile(selectedFile);
+      setError(null);
     }
   };
 
@@ -28,15 +32,17 @@ export const AddKnowledge = () => {
     if (!file) return;
 
     setIsUploading(true);
+    setError(null);
     try {
-      // TODO: Implement actual file upload logic
-      await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulated delay
+      await uploadKnowledge(file);
       setFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
     } catch (error) {
-      console.error("Upload failed:", error);
+      setError(
+        error instanceof Error ? error.message : "Failed to upload file"
+      );
     } finally {
       setIsUploading(false);
     }
@@ -115,6 +121,12 @@ export const AddKnowledge = () => {
             <Typography variant="body2" color="text.secondary">
               Selected file: {file.name}
             </Typography>
+          )}
+
+          {error && (
+            <Alert severity="error" sx={{ width: "100%" }}>
+              {error}
+            </Alert>
           )}
 
           <Button
