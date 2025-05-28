@@ -11,6 +11,8 @@ resource "aws_amplify_app" "frontend" {
         preBuild:
           commands:
             - cd apps/frontend/rag-chat
+            - npm cache clean --force
+            - rm -rf node_modules
             - npm ci
         build:
           commands:
@@ -44,6 +46,15 @@ resource "aws_amplify_branch" "master" {
 
   enable_auto_build = true
   enable_pull_request_preview = true
+  enable_basic_auth = false
+  enable_notification = true
+}
+
+# Add webhook for GitHub
+resource "aws_amplify_webhook" "master" {
+  app_id      = aws_amplify_app.frontend.id
+  branch_name = aws_amplify_branch.master.branch_name
+  description = "Webhook for master branch"
 }
 
 resource "aws_amplify_domain_association" "main" {
