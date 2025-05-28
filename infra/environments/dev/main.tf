@@ -55,3 +55,14 @@ module "queue_processor" {
   queue_url          = module.sqs.queue_url
   sns_topic_arn      = module.sns.topic_arn
 }
+
+module "amplify" {
+  source = "../../modules/amplify"
+
+  app_name       = "rag-chat-frontend-dev"
+  repository_url = var.repository_url
+  github_token   = var.github_token
+  backend_url    = module.api_gateway.api_url
+  domain_name    = var.domain_name
+  aws_region     = var.aws_region
+}

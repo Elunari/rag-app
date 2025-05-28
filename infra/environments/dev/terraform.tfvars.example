@@ -1,0 +1,24 @@
+# GitHub Fine-grained Personal Access Token (required)
+# Create one at: https://github.com/settings/tokens?type=beta
+# Required permissions:
+# - Repository access: Select your repository
+# - Repository permissions:
+#   - Contents: Read-only
+#   - Metadata: Read-only
+#   - Pull requests: Read-only
+#   - Webhooks: Read and write  # This is required for Amplify
+github_token = "github_pat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# GitHub Repository URL (required)
+# The URL of your GitHub repository
+repository_url = "https://github.com/your-username/knowledgeBase"
+
+# Custom Domain (optional)
+# If you want to use a custom domain, uncomment and set this
+# domain_name = "your-domain.com"
+
+# AWS Region (optional)
+# aws_region = "us-east-1"
+
+# Note: This is an example file. Copy it to terraform.tfvars and fill in your values.
+# DO NOT commit terraform.tfvars to version control as it contains sensitive information. 
