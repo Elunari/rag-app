@@ -8,6 +8,10 @@ export const uploadKnowledge = async (file: File): Promise<void> => {
   const response = await fetch(`${API_BASE_URL}/add_to_knowledge_base`, {
     method: "POST",
     body: formData,
+    headers: {
+      Accept: "application/json",
+    },
+    credentials: "include",
   });
 
   if (!response.ok) {

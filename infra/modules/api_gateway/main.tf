@@ -1,6 +1,12 @@
 resource "aws_apigatewayv2_api" "api" {
   name          = "lambda-api"
   protocol_type = "HTTP"
+  cors_configuration {
+    allow_origins = ["*"]  # In production, you should restrict this to your Amplify domain
+    allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allow_headers = ["Content-Type", "Authorization", "X-Amz-Date", "X-Api-Key", "X-Amz-Security-Token"]
+    max_age       = 300
+  }
 }
 
 resource "aws_apigatewayv2_integration" "lambda_integration" {
@@ -35,4 +41,12 @@ resource "aws_apigatewayv2_stage" "api_stage" {
 
 output "api_url" {
   value = aws_apigatewayv2_api.api.api_endpoint
+}
+
+resource "aws_lambda_permission" "api_gw" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = var.lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
 }
