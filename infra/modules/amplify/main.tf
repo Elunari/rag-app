@@ -35,6 +35,12 @@ resource "aws_amplify_app" "frontend" {
 
   enable_branch_auto_build = true
   enable_branch_auto_deletion = true
+
+  custom_rule {
+    source = "</^[^.]+$|\\.(?!(css|gif|ico|jpg|js|png|txt|svg|woff|woff2|ttf|map|json)$)([^.]+$)/>"
+    target = "/index.html"
+    status = "200"
+  }
 }
 
 resource "aws_amplify_branch" "master" {
