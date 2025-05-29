@@ -1,12 +1,22 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
+import React, { useEffect, useState } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { ThemeProvider, createTheme } from "@mui/material";
 import CssBaseline from "@mui/material/CssBaseline";
-import { Home } from "./pages/home/Home";
-import { Chats } from "./pages/chats/Chats";
+import auth from "./services/auth";
+import { Login } from "./pages/login/Login";
+import { Register } from "./pages/register/Register";
 import { Chat } from "./pages/chat/Chat";
+import { Chats } from "./pages/chats/Chats";
 import { NewChat } from "./pages/new-chat/NewChat";
 import { AddKnowledge } from "./pages/add-knowledge/AddKnowledge";
-import { Navbar } from "./Navbar";
+import { Home } from "./pages/home/Home";
+import { PrivateRoute } from "./components/PrivateRoute";
+import { Navbar } from "./components/Navbar";
 
 const theme = createTheme({
   palette: {
@@ -67,22 +77,121 @@ const theme = createTheme({
   },
 });
 
-function App() {
+const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [showRegister, setShowRegister] = useState(false);
+
+  useEffect(() => {
+    auth.configureAuth();
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const user = await auth.getCurrentUser();
+      setIsAuthenticated(!!user);
+    } catch (error) {
+      setIsAuthenticated(false);
+    }
+  };
+
+  const handleLoginSuccess = () => {
+    setIsAuthenticated(true);
+  };
+
+  const handleSwitchToRegister = () => {
+    setShowRegister(true);
+  };
+
+  const handleSwitchToLogin = () => {
+    setShowRegister(false);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await auth.signOut();
+      setIsAuthenticated(false);
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
+  if (isAuthenticated === null) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <BrowserRouter>
-        <Navbar />
+      <Router>
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/chats" element={<Chats />} />
-          <Route path="/chat/new" element={<NewChat />} />
-          <Route path="/chat/:id" element={<Chat />} />
-          <Route path="/add-knowledge" element={<AddKnowledge />} />
+          <Route
+            path="/login"
+            element={
+              !isAuthenticated ? (
+                showRegister ? (
+                  <Register onSwitchToLogin={handleSwitchToLogin} />
+                ) : (
+                  <Login
+                    onLoginSuccess={handleLoginSuccess}
+                    onSwitchToRegister={handleSwitchToRegister}
+                  />
+                )
+              ) : (
+                <Navigate to="/" replace />
+              )
+            }
+          />
+          <Route
+            path="/"
+            element={
+              <PrivateRoute>
+                <Navbar onLogout={handleLogout} />
+                <Home />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/chats"
+            element={
+              <PrivateRoute>
+                <Navbar onLogout={handleLogout} />
+                <Chats />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/chat/new"
+            element={
+              <PrivateRoute>
+                <Navbar onLogout={handleLogout} />
+                <NewChat />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/chat/:id"
+            element={
+              <PrivateRoute>
+                <Navbar onLogout={handleLogout} />
+                <Chat />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/add-knowledge"
+            element={
+              <PrivateRoute>
+                <Navbar onLogout={handleLogout} />
+                <AddKnowledge />
+              </PrivateRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </BrowserRouter>
+      </Router>
     </ThemeProvider>
   );
-}
+};
 
 export default App;

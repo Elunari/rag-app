@@ -31,6 +31,8 @@ resource "aws_amplify_app" "frontend" {
     REACT_APP_BACKEND_URL = var.backend_url
     REACT_APP_ENV         = "development"
     REACT_APP_REGION      = var.aws_region
+    REACT_APP_USER_POOL_ID = var.user_pool_id
+    REACT_APP_USER_POOL_CLIENT_ID = var.user_pool_client_id
   }
 
   enable_branch_auto_build = true

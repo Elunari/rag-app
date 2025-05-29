@@ -1,7 +1,11 @@
-import { Link, useLocation } from "react-router-dom";
-import { Box, useTheme } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Box, Button, useTheme } from "@mui/material";
+import LogoutIcon from "@mui/icons-material/Logout";
 import { useState } from "react";
+
+interface NavbarProps {
+  onLogout: () => Promise<void>;
+}
 
 const NavLink = ({
   to,
@@ -49,15 +53,25 @@ const NavLink = ({
   );
 };
 
-export const Navbar = () => {
+export const Navbar: React.FC<NavbarProps> = ({ onLogout }) => {
   const theme = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const isActive = (path: string) => {
     if (path === "/chats") {
       return location.pathname.startsWith("/chat");
     }
     return location.pathname === path;
+  };
+
+  const handleLogout = async () => {
+    try {
+      await onLogout();
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
   };
 
   return (
@@ -86,6 +100,21 @@ export const Navbar = () => {
           Add Knowledge
         </NavLink>
       </Box>
+      <Button
+        variant="outlined"
+        color="inherit"
+        startIcon={<LogoutIcon />}
+        onClick={handleLogout}
+        sx={{
+          borderColor: "rgba(255, 255, 255, 0.2)",
+          "&:hover": {
+            borderColor: "rgba(255, 255, 255, 0.4)",
+            background: "rgba(255, 255, 255, 0.05)",
+          },
+        }}
+      >
+        Logout
+      </Button>
     </Box>
   );
 };

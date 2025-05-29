@@ -28,5 +28,13 @@ variable "domain_name" {
 variable "aws_region" {
   description = "AWS region where resources are deployed"
   type        = string
-  default     = "us-east-1"
+}
+
+variable "user_pool_id" {
+  description = "Cognito User Pool ID"
+}
+
+variable "user_pool_client_id" {
+  description = "Cognito User Pool Client ID"
+  type        = string
 } 

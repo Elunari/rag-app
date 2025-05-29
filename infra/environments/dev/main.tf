@@ -14,9 +14,15 @@ module "lambda" {
 }
 
 module "api_gateway" {
-  source            = "../../modules/api_gateway"
-  lambda_invoke_arn    = module.lambda.lambda_invoke_arn
+  source = "../../modules/api_gateway"
+
+  api_name             = "rag-chat-api"
+  stage_name          = "dev"
+  lambda_invoke_arn   = module.lambda.lambda_invoke_arn
   lambda_function_name = module.lambda.lambda_function_name
+  cognito_user_pool_id = module.cognito.user_pool_id
+  cognito_client_id    = module.cognito.user_pool_client_id
+  aws_region          = var.aws_region
 }
 
 module "s3_trigger_lambda" {
@@ -57,6 +63,13 @@ module "queue_processor" {
   sns_topic_arn      = module.sns.topic_arn
 }
 
+module "cognito" {
+  source = "../../modules/cognito"
+
+  user_pool_name = "rag-chat-user-pool"
+  app_domain     = "master.djhjyu4g8gyz0.amplifyapp.com"
+}
+
 module "amplify" {
   source = "../../modules/amplify"
 
@@ -64,6 +77,8 @@ module "amplify" {
   repository_url = var.repository_url
   github_token   = var.github_token
   backend_url    = module.api_gateway.api_url
-  domain_name    = var.domain_name
   aws_region     = var.aws_region
+  domain_name    = var.domain_name
+  user_pool_id   = module.cognito.user_pool_id
+  user_pool_client_id = module.cognito.user_pool_client_id
 }
