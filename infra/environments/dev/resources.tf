@@ -87,7 +87,7 @@ resource "aws_iam_role_policy" "lambda_step_functions_policy" {
 resource "aws_lambda_permission" "api_gateway_invoke" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
-  function_name = module.lambda.lambda_name
+  function_name = module.api.lambda_name
   principal     = "apigateway.amazonaws.com"
 }
 
@@ -128,7 +128,27 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "sqs:GetQueueAttributes"
         ]
         Resource = module.sqs.queue_arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:Query",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Scan"
+        ]
+        Resource = [
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${module.dynamodb.chats_table_name}",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${module.dynamodb.messages_table_name}",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${module.dynamodb.chats_table_name}/index/*",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${module.dynamodb.messages_table_name}/index/*"
+        ]
       }
     ]
   })
 }
+
+data "aws_region" "current" {}
+data "aws_caller_identity" "current" {}

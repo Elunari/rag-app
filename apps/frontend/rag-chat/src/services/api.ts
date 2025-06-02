@@ -1,7 +1,15 @@
-import { Amplify } from "aws-amplify";
 import { fetchAuthSession } from "@aws-amplify/auth";
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
+
+export interface Chat {
+  userId: string;
+  chatId: string;
+  chatName: string;
+  createdAt: number;
+  lastMessageAt: number;
+  messageCount: number;
+}
 
 export const getAuthHeaders = async () => {
   try {
@@ -101,3 +109,18 @@ export const api = {
     return response.json();
   },
 };
+
+export async function createChat(chatName: string): Promise<Chat> {
+  const response = await api.post("/chats", { chatName });
+  return response.chat;
+}
+
+export async function getChats(): Promise<Chat[]> {
+  const response = await api.get("/chats");
+  return response.chats;
+}
+
+export async function getChat(chatId: string): Promise<Chat> {
+  const response = await api.get(`/chats/${chatId}`);
+  return response.chat;
+}

@@ -9,28 +9,72 @@ resource "aws_apigatewayv2_api" "api" {
   }
 }
 
+resource "aws_apigatewayv2_authorizer" "cognito_authorizer" {
+  api_id           = aws_apigatewayv2_api.api.id
+  authorizer_type  = "JWT"
+  identity_sources = ["$request.header.Authorization"]
+  name             = "cognito-authorizer"
+
+  jwt_configuration {
+    audience = [var.cognito_client_id]
+    issuer   = "https://cognito-idp.${var.aws_region}.amazonaws.com/${var.cognito_user_pool_id}"
+  }
+}
+
 resource "aws_apigatewayv2_integration" "lambda_integration" {
   api_id           = aws_apigatewayv2_api.api.id
   integration_type = "AWS_PROXY"
   integration_uri  = var.lambda_invoke_arn
 }
 
-resource "aws_apigatewayv2_route" "default_route" {
-  api_id    = aws_apigatewayv2_api.api.id
-  route_key = "GET /"
-  target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
+# Chat routes
+resource "aws_apigatewayv2_route" "list_chats" {
+  api_id             = aws_apigatewayv2_api.api.id
+  route_key          = "GET /chats"
+  target             = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito_authorizer.id
 }
 
-resource "aws_apigatewayv2_route" "send_prompt_route" {
-  api_id    = aws_apigatewayv2_api.api.id
-  route_key = "POST /send_prompt"
-  target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
+resource "aws_apigatewayv2_route" "create_chat" {
+  api_id             = aws_apigatewayv2_api.api.id
+  route_key          = "POST /chats/{chatName}"
+  target             = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito_authorizer.id
 }
 
-resource "aws_apigatewayv2_route" "add_to_knowledge_base_route" {
-  api_id    = aws_apigatewayv2_api.api.id
-  route_key = "POST /add_to_knowledge_base"
-  target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
+resource "aws_apigatewayv2_route" "get_chat" {
+  api_id             = aws_apigatewayv2_api.api.id
+  route_key          = "GET /chats/{chatId}"
+  target             = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito_authorizer.id
+}
+
+resource "aws_apigatewayv2_route" "send_message" {
+  api_id             = aws_apigatewayv2_api.api.id
+  route_key          = "POST /chats/{chatId}/messages"
+  target             = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito_authorizer.id
+}
+
+resource "aws_apigatewayv2_route" "get_messages" {
+  api_id             = aws_apigatewayv2_api.api.id
+  route_key          = "GET /chats/{chatId}/messages"
+  target             = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito_authorizer.id
+}
+
+# Knowledge base route
+resource "aws_apigatewayv2_route" "add_to_knowledge_base" {
+  api_id             = aws_apigatewayv2_api.api.id
+  route_key          = "POST /add_to_knowledge_base"
+  target             = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito_authorizer.id
 }
 
 resource "aws_apigatewayv2_stage" "api_stage" {

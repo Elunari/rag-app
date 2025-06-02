@@ -3,14 +3,15 @@ module "s3" {
   environment = "dev"
 }
 
-module "lambda" {
-  source            = "../../modules/lambdas"
-  lambda_name       = "api-lambda"
-  lambda_runtime    = "python3.9"
-  lambda_handler    = "api.lambda_handler"
-  lambda_role_arn   = aws_iam_role.lambda_role.arn
-  lambda_source_path = "../../../apps/lambdas/api.py"
-  s3_bucket_name    = module.s3.bucket_name
+module "api" {
+  source = "../../modules/api"
+
+  lambda_name        = "rag-chat-api"
+  lambda_runtime     = "python3.9"
+  lambda_role_arn    = aws_iam_role.lambda_role.arn
+  lambda_source_path = "../../../apps/api"
+  s3_bucket_name     = module.s3.bucket_name
+  project_name       = "rag-chat"
 }
 
 module "api_gateway" {
@@ -18,8 +19,8 @@ module "api_gateway" {
 
   api_name             = "rag-chat-api"
   stage_name          = "dev"
-  lambda_invoke_arn   = module.lambda.lambda_invoke_arn
-  lambda_function_name = module.lambda.lambda_function_name
+  lambda_invoke_arn   = module.api.lambda_invoke_arn
+  lambda_function_name = module.api.lambda_function_name
   cognito_user_pool_id = module.cognito.user_pool_id
   cognito_client_id    = module.cognito.user_pool_client_id
   aws_region          = var.aws_region
@@ -81,4 +82,12 @@ module "amplify" {
   domain_name    = var.domain_name
   user_pool_id   = module.cognito.user_pool_id
   user_pool_client_id = module.cognito.user_pool_client_id
+}
+
+module "dynamodb" {
+  source = "../../modules/dynamodb"
+
+  project_name    = "rag-chat"
+  environment     = "dev"
+  lambda_role_arn = aws_iam_role.lambda_role.arn
 }
