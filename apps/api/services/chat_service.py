@@ -4,13 +4,19 @@ from typing import Dict, Any, List
 import boto3
 import uuid
 import time
+import json
+import logging
 from utils.errors import APIError
+
+logger = logging.getLogger(__name__)
 
 class ChatService:
     def __init__(self):
         self.dynamodb = boto3.resource('dynamodb')
         self.table = self.dynamodb.Table(f"{os.environ['PROJECT_NAME']}-chats")
         self.messages_table = self.dynamodb.Table(f"{os.environ['PROJECT_NAME']}-messages")
+        self.bedrock = boto3.client('bedrock-runtime')
+        self.model_id = 'amazon.titan-text-lite-v1'
     
     def get_chats(self, user_id: str = None) -> List[Dict[str, Any]]:
         if user_id:
@@ -67,6 +73,33 @@ class ChatService:
         self.table.put_item(Item=chat)
         return chat
 
+    def _get_chat_history(self, chat_id: str) -> List[Dict[str, str]]:
+        """Get chat history in the format expected by Claude"""
+        response = self.messages_table.query(
+            KeyConditionExpression='chatId = :chatId',
+            ExpressionAttributeValues={
+                ':chatId': chat_id
+            },
+            ScanIndexForward=True
+        )
+        
+        messages = []
+        for item in response.get('Items', []):
+            role = 'assistant' if item['author'] == 'assistant' else 'user'
+            messages.append({
+                'role': role,
+                'content': item['message']
+            })
+        return messages
+
+    def _format_chat_history(self, chat_history: List[Dict[str, str]]) -> str:
+        """Format chat history for Titan Text Lite"""
+        formatted_history = ""
+        for msg in chat_history:
+            role = "Human" if msg['role'] == 'user' else "Assistant"
+            formatted_history += f"{role}: {msg['content']}\n"
+        return formatted_history
+
     def send_message(self, chat_id: str, content: str, user_id: str = None, role: str = 'user') -> Dict[str, Any]:
         if not user_id:
             raise APIError('User ID is required to send a message', 400)
@@ -74,6 +107,7 @@ class ChatService:
         chat = self.get_chat(chat_id, user_id)
         now = int(datetime.utcnow().timestamp() * 1000)
         
+        # Store user message
         user_message = {
             'chatId': chat_id,
             'messageId': f"msg_{now}_user",
@@ -98,32 +132,62 @@ class ChatService:
             }
         )
 
-        time.sleep(2)
+        chat_history = self._get_chat_history(chat_id)
+        formatted_history = self._format_chat_history(chat_history)
         
-        ai_response = {
-            'chatId': chat_id,
-            'messageId': f"msg_{now + 1}_assistant",
-            'userId': user_id,
-            'author': 'assistant',
-            'message': f"I'm a mock AI assistant. I received your message: '{content}'. This is a simulated response.",
-            'timestamp': now + 1000
+        prompt = {
+            "inputText": f"{formatted_history}Human: {content}\nAssistant:",
+            "textGenerationConfig": {
+                "maxTokenCount": 1024,
+                "temperature": 0.7,
+                "topP": 1
+            }
         }
         
-        self.messages_table.put_item(Item=ai_response)
-        
-        self.table.update_item(
-            Key={
+        try:
+            logger.info(f"Sending request to Bedrock with model {self.model_id}")
+            logger.debug(f"Prompt: {json.dumps(prompt)}")
+            
+            response = self.bedrock.invoke_model(
+                modelId=self.model_id,
+                body=json.dumps(prompt)
+            )
+            
+            response_body = json.loads(response['body'].read())
+            logger.debug(f"Bedrock response: {json.dumps(response_body)}")
+            
+            ai_message = response_body['results'][0]['outputText'].strip()
+            
+            ai_response = {
+                'chatId': chat_id,
+                'messageId': f"msg_{now + 1}_assistant",
                 'userId': user_id,
-                'chatId': chat_id
-            },
-            UpdateExpression="SET lastMessageAt = :lma, messageCount = messageCount + :inc",
-            ExpressionAttributeValues={
-                ':lma': now + 1000,
-                ':inc': 1
+                'author': 'assistant',
+                'message': ai_message,
+                'timestamp': now + 1000
             }
-        )
-        
-        return ai_response
+            
+            self.messages_table.put_item(Item=ai_response)
+            
+            self.table.update_item(
+                Key={
+                    'userId': user_id,
+                    'chatId': chat_id
+                },
+                UpdateExpression="SET lastMessageAt = :lma, messageCount = messageCount + :inc",
+                ExpressionAttributeValues={
+                    ':lma': now + 1000,
+                    ':inc': 1
+                }
+            )
+            
+            return ai_response
+            
+        except Exception as e:
+            logger.error(f"Error calling Bedrock: {str(e)}")
+            logger.error(f"Model ID: {self.model_id}")
+            logger.error(f"Prompt: {json.dumps(prompt)}")
+            raise APIError('Failed to get AI response', 500)
 
     def get_messages(self, chat_id: str, user_id: str) -> List[Dict[str, Any]]:
         """Get all messages for a chat in chronological order"""

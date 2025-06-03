@@ -55,7 +55,7 @@ export const Chat = () => {
       setChatHistory({
         id: chat.chatId,
         name: decodeURIComponent(chat.title),
-        createdAt: String(chat.createdAt),
+        createdAt: String(chat.created_at),
         messages: transformedMessages,
       });
     } catch (err) {
