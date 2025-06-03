@@ -8,20 +8,33 @@ import {
   TextField,
   Button,
   useTheme,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import ChatIcon from "@mui/icons-material/Chat";
+import { createChat } from "../../services/api";
 
 export const NewChat = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const [chatName, setChatName] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (chatName.trim()) {
-      // Hardcoded ID for now
-      const newChatId = "new-chat-123";
-      navigate(`/chat/${newChatId}`);
+    if (!chatName.trim()) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const chat = await createChat(chatName.trim());
+      navigate(`/chat/${chat.chatId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create chat");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -59,6 +72,12 @@ export const NewChat = () => {
           Give your chat a name to get started
         </Typography>
 
+        {error && (
+          <Alert severity="error" sx={{ width: "100%", mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
         <Box
           component="form"
           onSubmit={handleSubmit}
@@ -76,6 +95,8 @@ export const NewChat = () => {
             onChange={(e) => setChatName(e.target.value)}
             variant="outlined"
             required
+            disabled={isLoading}
+            error={!!error}
             sx={{
               "& .MuiOutlinedInput-root": {
                 background: "rgba(255, 255, 255, 0.05)",
@@ -93,7 +114,7 @@ export const NewChat = () => {
             type="submit"
             variant="contained"
             size="large"
-            disabled={!chatName.trim()}
+            disabled={!chatName.trim() || isLoading}
             sx={{
               mt: 2,
               py: 1.5,
@@ -105,7 +126,11 @@ export const NewChat = () => {
               transition: "all 0.2s ease-in-out",
             }}
           >
-            Start Chatting
+            {isLoading ? (
+              <CircularProgress size={24} color="inherit" />
+            ) : (
+              "Start Chatting"
+            )}
           </Button>
         </Box>
       </Paper>

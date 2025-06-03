@@ -57,6 +57,9 @@ const theme = createTheme({
       fontWeight: 500,
     },
   },
+  shape: {
+    borderRadius: 8,
+  },
   components: {
     MuiButton: {
       styleOverrides: {
@@ -71,6 +74,20 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           backgroundImage: "none",
+        },
+      },
+    },
+    MuiCssBaseline: {
+      styleOverrides: {
+        "@keyframes bounce": {
+          "0%, 80%, 100%": {
+            transform: "scale(0)",
+            opacity: 0.3,
+          },
+          "40%": {
+            transform: "scale(1)",
+            opacity: 1,
+          },
         },
       },
     },

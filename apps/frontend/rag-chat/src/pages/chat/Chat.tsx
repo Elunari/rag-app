@@ -1,7 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useParams } from "react-router-dom";
 import { ChatHistoryComponent } from "./ChatHistoryComponent";
 import { ChatInput } from "./ChatInput";
-import { Box, Container, Paper, Typography, useTheme } from "@mui/material";
+import {
+  Box,
+  Container,
+  Paper,
+  Typography,
+  useTheme,
+  CircularProgress,
+} from "@mui/material";
+import { getChat, getMessages, sendMessage, Message } from "../../services/api";
 
 export type ChatMessage = {
   id: string;
@@ -18,33 +27,133 @@ export type ChatHistory = {
 
 export const Chat = () => {
   const theme = useTheme();
-  const [chatHistory, setChatHistory] = useState<ChatHistory>({
-    id: "1",
-    name: "Chat 1",
-    createdAt: "2021-01-01",
-    messages: [
-      {
-        id: "1",
-        content: "Hello, how are you?",
-        role: "user",
-      },
-      {
-        id: "2",
-        content: "I'm fine, thank you!",
+  const { id } = useParams<{ id: string }>();
+  const [chatHistory, setChatHistory] = useState<ChatHistory | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
+
+  const loadChat = useCallback(async () => {
+    if (!id) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const chat = await getChat(id);
+
+      const messages = await getMessages(id);
+
+      const transformedMessages = messages.map((msg: Message) => ({
+        id: String(msg.timestamp),
+        content: msg.message,
+        role: msg.author as "user" | "assistant",
+      }));
+
+      setChatHistory({
+        id: chat.chatId,
+        name: decodeURIComponent(chat.title),
+        createdAt: String(chat.createdAt),
+        messages: transformedMessages,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load chat");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    loadChat();
+  }, [loadChat]);
+
+  const handleSendMessage = async (content: string) => {
+    if (!id || !chatHistory) return;
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      content,
+      role: "user",
+    };
+
+    setChatHistory((prev) => ({
+      ...prev!,
+      messages: [...(prev?.messages || []), userMessage],
+    }));
+
+    setIsSending(true);
+    try {
+      const response = await sendMessage(id, content);
+
+      const assistantMessage: ChatMessage = {
+        id: String(response.timestamp),
+        content: response.message,
         role: "assistant",
-      },
-      {
-        id: "3",
-        content: "What is the capital of France?",
-        role: "user",
-      },
-      {
-        id: "4",
-        content: "The capital of France is Paris.",
-        role: "assistant",
-      },
-    ],
-  });
+      };
+
+      setChatHistory((prev) => ({
+        ...prev!,
+        messages: [...(prev?.messages || []), assistantMessage],
+      }));
+    } catch (err) {
+      console.error("Error sending message:", err);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Container
+        maxWidth="lg"
+        sx={{
+          height: "calc(100vh - 64px)",
+          py: 2,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <CircularProgress />
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container
+        maxWidth="lg"
+        sx={{
+          height: "calc(100vh - 64px)",
+          py: 2,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Typography color="error">{error}</Typography>
+      </Container>
+    );
+  }
+
+  if (!chatHistory) {
+    return (
+      <Container
+        maxWidth="lg"
+        sx={{
+          height: "calc(100vh - 64px)",
+          py: 2,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Typography>Chat not found</Typography>
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="lg" sx={{ height: "calc(100vh - 64px)", py: 2 }}>
@@ -77,7 +186,10 @@ export const Chat = () => {
             p: 2,
           }}
         >
-          <ChatHistoryComponent chatHistory={chatHistory} />
+          <ChatHistoryComponent
+            chatHistory={chatHistory}
+            isWaitingForResponse={isSending}
+          />
         </Box>
 
         <Box
@@ -86,7 +198,11 @@ export const Chat = () => {
             borderTop: "1px solid rgba(255, 255, 255, 0.1)",
           }}
         >
-          <ChatInput />
+          <ChatInput
+            chatId={id!}
+            onSendMessage={handleSendMessage}
+            isSending={isSending}
+          />
         </Box>
       </Paper>
     </Container>

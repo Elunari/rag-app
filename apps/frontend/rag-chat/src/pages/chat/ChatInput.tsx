@@ -2,15 +2,26 @@ import { useState } from "react";
 import { Box, TextField, IconButton, useTheme } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
 
-export const ChatInput = () => {
+interface ChatInputProps {
+  chatId: string;
+  onSendMessage: (content: string) => Promise<void>;
+  isSending: boolean;
+}
+
+export const ChatInput = ({
+  chatId,
+  onSendMessage,
+  isSending,
+}: ChatInputProps) => {
   const theme = useTheme();
   const [message, setMessage] = useState("");
 
-  const handleSend = () => {
-    if (message.trim()) {
-      // TODO: Implement send message logic
-      setMessage("");
-    }
+  const handleSend = async () => {
+    if (!message.trim() || isSending) return;
+
+    const content = message.trim();
+    setMessage(""); // Clear input immediately
+    await onSendMessage(content);
   };
 
   const handleKeyPress = (event: React.KeyboardEvent) => {
@@ -38,6 +49,7 @@ export const ChatInput = () => {
         placeholder="Type your message..."
         variant="outlined"
         size="small"
+        disabled={isSending}
         sx={{
           "& .MuiOutlinedInput-root": {
             background: "rgba(255, 255, 255, 0.05)",
@@ -52,7 +64,7 @@ export const ChatInput = () => {
       />
       <IconButton
         onClick={handleSend}
-        disabled={!message.trim()}
+        disabled={!message.trim() || isSending}
         sx={{
           background: theme.palette.primary.main,
           color: theme.palette.primary.contrastText,

@@ -8,12 +8,21 @@ class DecimalEncoder(json.JSONEncoder):
             return int(obj) if obj % 1 == 0 else float(obj)
         return super(DecimalEncoder, self).default(obj)
 
+def get_cors_headers() -> Dict[str, str]:
+    """Get CORS headers for the response"""
+    return {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+    }
+
 def create_response(data: Dict[str, Any], status_code: int = 200) -> Dict[str, Any]:
     """Create a standardized API response"""
     return {
         'statusCode': status_code,
         'headers': {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            **get_cors_headers()
         },
         'body': json.dumps(data, cls=DecimalEncoder)
     }
@@ -28,7 +37,8 @@ def error_response(error: Exception, status_code: Optional[int] = None) -> Dict[
     return {
         'statusCode': status_code,
         'headers': {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            **get_cors_headers()
         },
         'body': json.dumps({'error': str(error)}, cls=DecimalEncoder)
     } 
