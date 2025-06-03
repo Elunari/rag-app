@@ -5,7 +5,7 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 export interface Chat {
   chatId: string;
   title: string;
-  createdAt: number;
+  created_at: number;
   updated_at: string;
   userId: string;
   messageCount: number;

@@ -150,7 +150,7 @@ export const Chats = () => {
                     secondary={`${chat.messageCount} messages`}
                   />
                   <Chip
-                    label={new Date(chat.createdAt).toLocaleDateString()}
+                    label={new Date(chat.updated_at).toLocaleDateString()}
                     size="small"
                     sx={{
                       background: "rgba(255, 255, 255, 0.1)",

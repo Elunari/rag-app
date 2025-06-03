@@ -18,7 +18,6 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
 
     const checkAuth = async () => {
       if (!mounted) return;
-      console.log(await auth.getSession());
 
       try {
         const session = await auth.getSession();
@@ -27,7 +26,6 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
           setIsLoading(false);
         }
       } catch (error) {
-        console.log("Auth check failed:", error);
         if (mounted) {
           setIsAuthenticated(false);
           setIsLoading(false);
