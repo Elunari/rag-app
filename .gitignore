@@ -1,6 +1,5 @@
 apps/frontend/node_modules
 infra/environments/dev/.terraform
-infra/environments/dev/.terraform.lock.hcl
 infra/environments/dev/*.zip
 infra/environments/dev/terraform.tfstate
 infra/environments/dev/terraform.tfstate.backup
