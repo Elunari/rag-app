@@ -91,6 +91,27 @@ resource "aws_lambda_permission" "api_gateway_invoke" {
   principal     = "apigateway.amazonaws.com"
 }
 
+resource "aws_iam_policy" "bedrock_invoke_policy" {
+  name        = "BedrockInvokeNovaModelPolicy"
+  description = "Allows invoking the Nova foundation model"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["bedrock:InvokeModel"]
+        Resource = ["arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0"]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "bedrock_attachment" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = aws_iam_policy.bedrock_invoke_policy.arn
+}
+
 # IAM policy for Lambda
 resource "aws_iam_role_policy" "lambda_policy" {
   name = "lambda-policy"
@@ -147,13 +168,6 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${module.dynamodb.chats_table_name}/index/*",
           "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${module.dynamodb.messages_table_name}/index/*"
         ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "bedrock:InvokeModel"
-        ]
-        Resource = "arn:aws:bedrock:eu-central-1::foundation-model/amazon.titan-text-express-v1"
       },
       {
         Effect = "Allow"
