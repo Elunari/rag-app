@@ -15,9 +15,9 @@ class ChatService:
         self.dynamodb = boto3.resource('dynamodb')
         self.table = self.dynamodb.Table(f"{os.environ['PROJECT_NAME']}-chats")
         self.messages_table = self.dynamodb.Table(f"{os.environ['PROJECT_NAME']}-messages")
-        self.bedrock = boto3.client('bedrock-runtime')
+        self.bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
         self.kendra = boto3.client('kendra', region_name='us-east-1')
-        self.model_id = 'amazon.titan-text-express-v1'
+        self.model_id = 'amazon.nova-lite-v1:0'
         self.kendra_index_id = os.environ['KENDRA_INDEX_ID']
     
     def get_chats(self, user_id: str = None) -> List[Dict[str, Any]]:
@@ -187,28 +187,39 @@ class ChatService:
         
         logger.info("CONTEXT: %s", f"{formatted_history}{context_prompt}Human: {content}\nAssistant:")
         
-        prompt = {
-            "inputText": f"{formatted_history}{context_prompt}Human: {content}\nAssistant:",
-            "textGenerationConfig": {
-                "maxTokenCount": 1024,
-                "temperature": 0.7,
-                "topP": 1
-            }
-        }
+        # Format messages for Nova API
+        messages = []
+        
+        # Add chat history
+        for msg in chat_history:
+            messages.append({
+                "role": msg['role'],
+                "content": [
+                    {
+                        "text": msg['content']
+                    }
+                ]
+            })
         
         try:
             logger.info(f"Sending request to Bedrock with model {self.model_id}")
-            logger.debug(f"Prompt: {json.dumps(prompt)}")
-            
-            response = self.bedrock.invoke_model(
-                modelId=self.model_id,
-                body=json.dumps(prompt)
+
+            inf_params = {"maxTokens": 1000, "topP": 0.1, "temperature": 0.3}
+
+            response = self.bedrock.converse(
+                modelId="us.amazon.nova-lite-v1:0", 
+                messages=messages, 
+                system=[{"text": context_prompt}], 
+                inferenceConfig=inf_params,
             )
+
+            logger.info(response)
             
             response_body = json.loads(response['body'].read())
             logger.debug(f"Bedrock response: {json.dumps(response_body)}")
             
-            ai_message = response_body['results'][0]['outputText'].strip()
+            # Extract the response text from Nova's response format
+            ai_message = response_body['completion'].strip()
             
             ai_response = {
                 'chatId': chat_id,
@@ -238,7 +249,6 @@ class ChatService:
         except Exception as e:
             logger.error(f"Error calling Bedrock: {str(e)}")
             logger.error(f"Model ID: {self.model_id}")
-            logger.error(f"Prompt: {json.dumps(prompt)}")
             raise APIError('Failed to get AI response', 500)
 
     def get_messages(self, chat_id: str, user_id: str) -> List[Dict[str, Any]]:

@@ -100,7 +100,7 @@ resource "aws_iam_policy" "bedrock_invoke_policy" {
     Statement = [
       {
         Effect   = "Allow"
-        Action   = ["bedrock:InvokeModel"]
+        Action   = ["bedrock:InvokeModel", "bedrock:*"]
         Resource = ["arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0"]
       }
     ]
