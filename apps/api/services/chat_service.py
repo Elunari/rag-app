@@ -16,7 +16,9 @@ class ChatService:
         self.table = self.dynamodb.Table(f"{os.environ['PROJECT_NAME']}-chats")
         self.messages_table = self.dynamodb.Table(f"{os.environ['PROJECT_NAME']}-messages")
         self.bedrock = boto3.client('bedrock-runtime')
-        self.model_id = 'amazon.titan-text-lite-v1'
+        self.kendra = boto3.client('kendra', region_name='us-east-1')
+        self.model_id = 'amazon.titan-text-express-v1'
+        self.kendra_index_id = os.environ['KENDRA_INDEX_ID']
     
     def get_chats(self, user_id: str = None) -> List[Dict[str, Any]]:
         if user_id:
@@ -99,6 +101,40 @@ class ChatService:
             role = "Human" if msg['role'] == 'user' else "Assistant"
             formatted_history += f"{role}: {msg['content']}\n"
         return formatted_history
+    
+    def _query_kendra(self, query: str) -> str:
+        """Query Kendra for relevant context based on the user's message."""
+        try:
+            response = self.kendra.query(
+                IndexId=self.kendra_index_id,
+                QueryText=query
+            )
+
+            if not response.get('ResultItems'):
+                return ""
+
+            # Limit to top 3 most relevant results manually
+            result_items = response['ResultItems'][:3]
+
+            # Combine the relevant passages from Kendra results
+            context_parts = []
+            for item in result_items:
+                title = item.get('DocumentTitle', {}).get('Text') if isinstance(item.get('DocumentTitle'), dict) else item.get('DocumentTitle', 'Untitled')
+                excerpt = item.get('DocumentExcerpt', {}).get('Text', '')
+
+                context_parts.append(
+                    f"Relevant information from document '{title}':\n{excerpt}"
+                )
+            
+            logger.info(result_items)
+
+            return "\n\n".join(context_parts)
+
+        except Exception as e:
+            logger.error("Error querying Kendra: %s", str(e))
+            return ""
+
+
 
     def send_message(self, chat_id: str, content: str, user_id: str = None, role: str = 'user') -> Dict[str, Any]:
         if not user_id:
@@ -132,11 +168,27 @@ class ChatService:
             }
         )
 
+        logger.info("QUERYING KENDRA")
+
+        # Get relevant context from Kendra
+        kendra_context = self._query_kendra(content)
+
+        logger.info("KENDRA content: %s", kendra_context)
+
         chat_history = self._get_chat_history(chat_id)
+
+        logger.info("CHAT HISTORY: %s", chat_history)
         formatted_history = self._format_chat_history(chat_history)
+
+        logger.info("FORMATTED HISTORY: %s", formatted_history)
+        
+        # Include Kendra context in the prompt if available
+        context_prompt = f"\nHere is some relevant information that might help answer the question:\n{kendra_context}\n\n" if kendra_context else ""
+        
+        logger.info("CONTEXT: %s", f"{formatted_history}{context_prompt}Human: {content}\nAssistant:")
         
         prompt = {
-            "inputText": f"{formatted_history}Human: {content}\nAssistant:",
+            "inputText": f"{formatted_history}{context_prompt}Human: {content}\nAssistant:",
             "textGenerationConfig": {
                 "maxTokenCount": 1024,
                 "temperature": 0.7,

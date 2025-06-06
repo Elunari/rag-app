@@ -153,7 +153,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
         Action = [
           "bedrock:InvokeModel"
         ]
-        Resource = "arn:aws:bedrock:*::foundation-model/amazon.titan-text-lite-v1"
+        Resource = "arn:aws:bedrock:eu-central-1::foundation-model/amazon.titan-text-express-v1"
       },
       {
         Effect = "Allow"
@@ -168,7 +168,9 @@ resource "aws_iam_role_policy" "lambda_policy" {
         Action = [
           "kendra:BatchPutDocument",
           "kendra:BatchDeleteDocument",
-          "kendra:SubmitFeedback"
+          "kendra:SubmitFeedback",
+          "kendra:Query",
+          "kendra:DescribeIndex"
         ]
         Resource = module.kendra.index_arn
       }

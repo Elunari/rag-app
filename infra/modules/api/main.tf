@@ -17,6 +17,7 @@ resource "aws_lambda_function" "api" {
     variables = {
       S3_BUCKET_NAME = var.s3_bucket_name
       PROJECT_NAME   = var.project_name
+      KENDRA_INDEX_ID = var.kendra_index_id
     }
   }
 }

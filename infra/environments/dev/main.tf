@@ -12,6 +12,7 @@ module "api" {
   lambda_source_path = "../../../apps/api"
   s3_bucket_name     = module.s3.bucket_name
   project_name       = "rag-chat"
+  kendra_index_id    = module.kendra.index_id
 }
 
 module "api_gateway" {

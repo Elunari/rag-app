@@ -27,3 +27,8 @@ variable "project_name" {
   description = "Name of the project"
   type        = string
 }
+
+variable "kendra_index_id" {
+  description = "ID of the Kendra index"
+  type        = string
+}
