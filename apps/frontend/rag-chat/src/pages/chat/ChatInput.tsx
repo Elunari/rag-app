@@ -20,7 +20,7 @@ export const ChatInput = ({
     if (!message.trim() || isSending) return;
 
     const content = message.trim();
-    setMessage(""); // Clear input immediately
+    setMessage("");
     await onSendMessage(content);
   };
 

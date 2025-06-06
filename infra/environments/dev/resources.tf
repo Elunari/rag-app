@@ -125,7 +125,9 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "sqs:SendMessage",
           "sqs:ReceiveMessage",
           "sqs:DeleteMessage",
-          "sqs:GetQueueAttributes"
+          "sqs:GetQueueAttributes",
+          "sqs:ChangeMessageVisibility",
+          "sqs:GetQueueUrl"
         ]
         Resource = module.sqs.queue_arn
       },
@@ -152,6 +154,65 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "bedrock:InvokeModel"
         ]
         Resource = "arn:aws:bedrock:*::foundation-model/amazon.titan-text-lite-v1"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "textract:StartDocumentAnalysis",
+          "textract:GetDocumentAnalysis"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kendra:BatchPutDocument",
+          "kendra:BatchDeleteDocument",
+          "kendra:SubmitFeedback"
+        ]
+        Resource = module.kendra.index_arn
+      }
+    ]
+  })
+}
+
+# Create IAM role for Kendra
+resource "aws_iam_role" "kendra_role" {
+  provider = aws.kendra
+  name = "kendra-service-role-dev"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "kendra.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+# Create custom policy for Kendra
+resource "aws_iam_role_policy" "kendra_policy" {
+  provider = aws.kendra
+  name = "kendra-service-policy"
+  role = aws_iam_role.kendra_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:PutMetricData",
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "*"
       }
     ]
   })

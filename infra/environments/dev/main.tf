@@ -54,14 +54,27 @@ module "sns" {
   queue_arn     = module.sqs.queue_arn
 }
 
-module "queue_processor" {
-  source = "../../modules/queue_processor"
+module "kendra" {
+  source = "../../modules/kendra"
+
+  index_name        = "knowledge-base-index-dev"
+  index_description = "Knowledge Base Search Index"
+  role_arn         = aws_iam_role.kendra_role.arn
+  edition          = "DEVELOPER_EDITION"
+  kms_key_id       = null  # Using AWS managed key
+}
+
+module "embeddings_processor" {
+  source = "../../modules/embeddings_processor"
   
-  lambda_name        = "file-queue-processor-dev"
-  lambda_source_path = "../../../apps/s3-trigger-lambda/queue_processor.py"
+  lambda_name        = "embeddings-processor-dev"
+  lambda_source_dir  = "../../../apps/embeddings_processor"
   lambda_role_arn    = aws_iam_role.lambda_role.arn
   queue_url          = module.sqs.queue_url
+  queue_arn          = module.sqs.queue_arn
   sns_topic_arn      = module.sns.topic_arn
+  kendra_index_id    = module.kendra.index_id
+  s3_bucket_name     = module.s3.bucket_name
 }
 
 module "cognito" {

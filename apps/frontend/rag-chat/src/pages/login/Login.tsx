@@ -33,7 +33,6 @@ export const Login: React.FC<LoginProps> = ({
 
     try {
       if (needsConfirmation) {
-        console.log("Confirming signup with:", { username, confirmationCode });
         await auth.confirmSignup(username, confirmationCode);
         setNeedsConfirmation(false);
         setConfirmationCode("");
@@ -56,9 +55,7 @@ export const Login: React.FC<LoginProps> = ({
   };
 
   const handleLogin = async () => {
-    console.log("Attempting login with:", { username });
     const result = await auth.signIn(username, password);
-    console.log("Login successful:", result);
     onLoginSuccess();
   };
 

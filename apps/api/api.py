@@ -1,5 +1,5 @@
 import json
-import os
+import io
 import logging
 from typing import Dict, Any
 
@@ -7,6 +7,8 @@ from services.chat_service import ChatService
 from services.knowledge_base_service import KnowledgeBaseService
 from utils.response import create_response, error_response
 from utils.errors import APIError
+import cgi
+import base64
 
 # Configure logging
 logger = logging.getLogger()
@@ -23,25 +25,19 @@ def get_user_id(event: Dict[str, Any]) -> str:
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Main Lambda handler function"""
     try:
-        # Log the incoming event
         logger.info(f"Received event: {json.dumps(event)}")
         
-        # Get the HTTP method and path from the correct location in the event
         http_method = event.get('httpMethod', '')
         path = event.get('path', '')
         
-        # Log the method and path
         logger.info(f"Method: {http_method}, Path: {path}")
         
-        # Normalize path (remove leading/trailing slashes)
         path = path.strip('/')
         logger.info(f"Normalized path: {path}")
         
-        # Initialize services
         chat_service = ChatService()
         kb_service = KnowledgeBaseService()
         
-        # Get user ID for authenticated routes
         user_id = None
         if path.startswith('chats'):
             try:
@@ -51,7 +47,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 logger.error(f"Authentication error: {str(e)}")
                 raise
         
-        # Route the request
         if path == 'chats' and http_method == 'GET':
             logger.info("Handling GET /chats request")
             chats = chat_service.get_chats(user_id)
@@ -88,10 +83,17 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
         elif path == 'add_to_knowledge_base' and http_method == 'POST':
             logger.info("Handling POST /add_to_knowledge_base request")
-            data = json.loads(event.get('body', '{}'))
-            result = kb_service.add_file(
-                data.get('content', ''),
-                data.get('filename', '')
+            content_type = event.get('headers', {}).get('Content-Type', '')
+            body = event.get('body', '')
+            if event.get('isBase64Encoded', False):
+                body = base64.b64decode(body)
+            form = cgi.FieldStorage(
+                fp=io.BytesIO(body),
+                headers={'content-type': content_type},
+                environ={'REQUEST_METHOD': 'POST'}
+            )
+            result = kb_service.add_to_knowledge_base(
+                form['file']
             )
             return create_response(result)
             

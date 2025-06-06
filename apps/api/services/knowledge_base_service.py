@@ -1,6 +1,11 @@
 import boto3
 import os
 from typing import Dict, Any
+import uuid
+from datetime import datetime
+import traceback
+import json
+
 
 class KnowledgeBaseService:
     def __init__(self):
@@ -8,20 +13,66 @@ class KnowledgeBaseService:
         self.bucket_name = os.environ['S3_BUCKET_NAME']
         self.project_name = os.environ['PROJECT_NAME']
 
-    def add_file(self, file_content: str, file_name: str) -> Dict[str, Any]:
-        """Add a file to the knowledge base"""
-        if not file_content or not file_name:
-            raise ValueError('Missing required fields')
-
-        # Upload to S3
-        key = f"{self.project_name}/documents/{file_name}"
-        self.s3.put_object(
-            Bucket=self.bucket_name,
-            Key=key,
-            Body=file_content
-        )
-
-        return {
-            'message': 'Document added successfully',
-            'key': key
-        } 
+    def add_to_knowledge_base(self, file_field):
+        try:
+            file_data = file_field.file.read()
+            original_filename = file_field.filename
+            
+            file_extension = os.path.splitext(original_filename)[1]
+            unique_filename = f"{uuid.uuid4()}{file_extension}"
+            
+            temp_path = os.path.join('/tmp', unique_filename)
+            with open(temp_path, 'wb') as f:
+                f.write(file_data)
+                
+            try:
+                s3_client = boto3.client('s3')
+            except Exception as e:
+                raise
+            
+            bucket_name = os.environ.get('S3_BUCKET_NAME')
+            if not bucket_name:
+                raise ValueError("S3_BUCKET_NAME environment variable is not set")
+                
+            
+            try:
+                print(f"File size: {os.path.getsize(temp_path)} bytes")
+                print(f"File exists: {os.path.exists(temp_path)}")
+                print(f"File permissions: {oct(os.stat(temp_path).st_mode)[-3:]}")
+                
+                print("Starting S3 upload...")
+                s3_client.upload_file(
+                    temp_path,
+                    bucket_name,
+                    unique_filename,
+                    ExtraArgs={
+                        'ContentType': file_field.type or 'application/pdf',
+                        'Metadata': {
+                            'original_filename': original_filename,
+                            'upload_date': datetime.utcnow().isoformat()
+                        }
+                    }
+                )
+            except Exception as s3_error:
+                raise s3_error
+            
+            # Clean up temporary file
+            os.remove(temp_path)
+            
+            return {
+                'statusCode': 200,
+                'body': json.dumps({
+                    'message': f'Successfully uploaded file to S3',
+                    'original_filename': original_filename,
+                    's3_key': unique_filename,
+                    'bucket': bucket_name,
+                    'timestamp': datetime.utcnow().isoformat() + 'Z'
+                })
+            }
+        except Exception as e:
+            print(f"Error processing file: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            return {
+                'statusCode': 500,
+                'body': json.dumps({'message': f'Error processing file: {str(e)}'})
+            }
