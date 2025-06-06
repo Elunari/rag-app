@@ -18,6 +18,7 @@ export const AddKnowledge = () => {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -25,6 +26,7 @@ export const AddKnowledge = () => {
     if (selectedFile && selectedFile.type === "application/pdf") {
       setFile(selectedFile);
       setError(null);
+      setSuccess(null);
     }
   };
 
@@ -33,6 +35,7 @@ export const AddKnowledge = () => {
 
     setIsUploading(true);
     setError(null);
+    setSuccess(null);
     try {
       await uploadKnowledge(file);
       setFile(null);
@@ -45,6 +48,9 @@ export const AddKnowledge = () => {
       );
     } finally {
       setIsUploading(false);
+      setSuccess(
+        "Data sent sucessfully. Soon it will be added to knowledge base"
+      );
     }
   };
 
@@ -126,6 +132,12 @@ export const AddKnowledge = () => {
           {error && (
             <Alert severity="error" sx={{ width: "100%" }}>
               {error}
+            </Alert>
+          )}
+
+          {success && (
+            <Alert severity="success" sx={{ width: "100%" }}>
+              {success}
             </Alert>
           )}
 
