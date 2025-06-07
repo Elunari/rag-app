@@ -170,6 +170,9 @@ def process_file(bucket: str, key: str) -> Dict[str, Any]:
         )
         
         s3_object = get_s3_object(bucket, key)
+
+        text = extract_text_from_pdf(s3_object)
+        logger.info(f"Successfully extracted text from PDF, length: {len(text)} characters")
         
         # Get object metadata from S3
         response = s3.head_object(Bucket=bucket, Key=key)
@@ -195,6 +198,9 @@ def process_file(bucket: str, key: str) -> Dict[str, Any]:
                 })
             }
         
+        store_in_kendra(text, metadata)
+        logger.info(f"Successfully stored document in Kendra: {filename}")
+
         # Send success notification to SNS
         success_message = {
             'status': 'success',
