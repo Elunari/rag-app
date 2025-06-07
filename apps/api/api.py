@@ -22,6 +22,14 @@ def get_user_id(event: Dict[str, Any]) -> str:
         raise APIError('Unauthorized', 401)
     return user_id
 
+def get_user_email(event: Dict[str, Any]) -> str:
+    """Extract user email from the event"""
+    claims = event.get('requestContext', {}).get('authorizer', {}).get('claims', {})
+    email = claims.get('email')
+    if not email:
+        logger.warning("No email found in claims")
+    return email
+
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Main Lambda handler function"""
     try:
@@ -39,10 +47,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         kb_service = KnowledgeBaseService()
         
         user_id = None
-        if path.startswith('chats'):
+        user_email = None
+        if path.startswith('chats') or path == 'add_to_knowledge_base':
             try:
                 user_id = get_user_id(event)
-                logger.info(f"User ID: {user_id}")
+                user_email = get_user_email(event)
+                logger.info(f"User ID: {user_id}, Email: {user_email}")
             except APIError as e:
                 logger.error(f"Authentication error: {str(e)}")
                 raise
@@ -93,7 +103,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 environ={'REQUEST_METHOD': 'POST'}
             )
             result = kb_service.add_to_knowledge_base(
-                form['file']
+                form['file'],
+                user_email
             )
             return create_response(result)
             

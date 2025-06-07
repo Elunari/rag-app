@@ -73,4 +73,38 @@ resource "aws_sns_topic_subscription" "queue" {
   topic_arn = aws_sns_topic.file_processing.arn
   protocol  = "sqs"
   endpoint  = var.queue_arn
+}
+
+resource "aws_sns_topic" "notification_topic" {
+  name = "${var.environment}-notification-topic"
+}
+
+resource "aws_sns_topic_policy" "notification_topic_policy" {
+  arn = aws_sns_topic.notification_topic.arn
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "s3.amazonaws.com"
+        }
+        Action   = "SNS:Publish"
+        Resource = aws_sns_topic.notification_topic.arn
+        Condition = {
+          ArnLike = {
+            "aws:SourceArn": var.s3_bucket_arn
+          }
+        }
+      }
+    ]
+  })
+}
+
+# Add notification handler Lambda as a subscriber
+resource "aws_sns_topic_subscription" "notification_handler" {
+  topic_arn = aws_sns_topic.notification_topic.arn
+  protocol  = "lambda"
+  endpoint  = var.notification_handler_lambda_arn
 } 

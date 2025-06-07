@@ -19,4 +19,9 @@ variable "aws_region" {
   description = "AWS region where resources are deployed"
   type        = string
   default     = "us-east-1"
+}
+
+variable "ses_sender_email" {
+  description = "Email address to use as the sender for SES notifications"
+  type        = string
 } 

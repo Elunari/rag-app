@@ -46,13 +46,26 @@ module "sqs" {
   queue_name = "file-processing-queue-dev"
 }
 
+module "notification_handler" {
+  source = "../../modules/notification_handler"
+  
+  environment        = "dev"
+  lambda_source_dir  = "../../../apps/s3-trigger-lambda"
+  sns_topic_arn     = module.sns.notification_topic_arn
+  ses_sender_email  = var.ses_sender_email
+  lambda_role_arn   = aws_iam_role.lambda_role.arn
+}
+
 module "sns" {
   source = "../../modules/sns"
   
-  topic_name     = "file-processing-notifications-dev"
-  lambda_role_id = aws_iam_role.lambda_role.id
-  queue_url     = module.sqs.queue_url
-  queue_arn     = module.sqs.queue_arn
+  topic_name                    = "file-processing-notifications-dev"
+  lambda_role_id               = aws_iam_role.lambda_role.id
+  queue_url                    = module.sqs.queue_url
+  queue_arn                    = module.sqs.queue_arn
+  environment                  = "dev"
+  s3_bucket_arn               = module.s3.bucket_arn
+  notification_handler_lambda_arn = module.notification_handler.lambda_function_arn
 }
 
 module "kendra" {
@@ -74,6 +87,7 @@ module "embeddings_processor" {
   queue_url          = module.sqs.queue_url
   queue_arn          = module.sqs.queue_arn
   sns_topic_arn      = module.sns.topic_arn
+  notification_topic_arn = module.sns.notification_topic_arn
   kendra_index_id    = module.kendra.index_id
   s3_bucket_name     = module.s3.bucket_name
 }

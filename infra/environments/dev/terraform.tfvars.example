@@ -21,4 +21,5 @@ repository_url = "https://github.com/your-username/knowledgeBase"
 # aws_region = "us-east-1"
 
 # Note: This is an example file. Copy it to terraform.tfvars and fill in your values.
-# DO NOT commit terraform.tfvars to version control as it contains sensitive information. 
+# DO NOT commit terraform.tfvars to version control as it contains sensitive information.
+ses_sender_email = "notifications@your-domain.com" 

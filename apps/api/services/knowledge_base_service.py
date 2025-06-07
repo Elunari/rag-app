@@ -13,7 +13,7 @@ class KnowledgeBaseService:
         self.bucket_name = os.environ['S3_BUCKET_NAME']
         self.project_name = os.environ['PROJECT_NAME']
 
-    def add_to_knowledge_base(self, file_field):
+    def add_to_knowledge_base(self, file_field, user_email: str = None):
         try:
             file_data = file_field.file.read()
             original_filename = file_field.filename
@@ -34,6 +34,18 @@ class KnowledgeBaseService:
             if not bucket_name:
                 raise ValueError("S3_BUCKET_NAME environment variable is not set")
                 
+            # Prepare metadata
+            metadata = {
+                'original_filename': original_filename,
+                'upload_date': datetime.utcnow().isoformat()
+            }
+            
+            # Only add user_email to metadata if it's provided
+            if user_email:
+                metadata['user_email'] = user_email
+                print(f"Adding user email to metadata: {user_email}")
+            else:
+                print("No user email provided, skipping email notification")
             
             try:
                 print(f"File size: {os.path.getsize(temp_path)} bytes")
@@ -47,10 +59,7 @@ class KnowledgeBaseService:
                     unique_filename,
                     ExtraArgs={
                         'ContentType': file_field.type or 'application/pdf',
-                        'Metadata': {
-                            'original_filename': original_filename,
-                            'upload_date': datetime.utcnow().isoformat()
-                        }
+                        'Metadata': metadata
                     }
                 )
             except Exception as s3_error:
@@ -66,7 +75,8 @@ class KnowledgeBaseService:
                     'original_filename': original_filename,
                     's3_key': unique_filename,
                     'bucket': bucket_name,
-                    'timestamp': datetime.utcnow().isoformat() + 'Z'
+                    'timestamp': datetime.utcnow().isoformat() + 'Z',
+                    'user_email': user_email
                 })
             }
         except Exception as e:

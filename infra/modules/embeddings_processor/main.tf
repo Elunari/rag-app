@@ -17,7 +17,7 @@ resource "aws_lambda_function" "embeddings_processor" {
   environment {
     variables = {
       QUEUE_URL       = var.queue_url
-      SNS_TOPIC_ARN   = var.sns_topic_arn
+      SNS_TOPIC_ARN   = var.notification_topic_arn
       KENDRA_INDEX_ID = var.kendra_index_id
       S3_BUCKET_NAME  = var.s3_bucket_name
     }

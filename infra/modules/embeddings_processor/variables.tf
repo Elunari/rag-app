@@ -24,7 +24,12 @@ variable "queue_arn" {
 }
 
 variable "sns_topic_arn" {
-  description = "ARN of the SNS topic"
+  description = "ARN of the SNS topic for file processing (used for SQS)"
+  type        = string
+}
+
+variable "notification_topic_arn" {
+  description = "ARN of the SNS topic for notifications (used for email notifications)"
   type        = string
 }
 

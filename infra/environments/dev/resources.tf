@@ -91,25 +91,43 @@ resource "aws_lambda_permission" "api_gateway_invoke" {
   principal     = "apigateway.amazonaws.com"
 }
 
-resource "aws_iam_policy" "bedrock_invoke_policy" {
-  name        = "BedrockInvokeNovaModelPolicy"
-  description = "Allows invoking the Nova foundation model"
+# IAM policy for Lambda to send emails via SES
+resource "aws_iam_role_policy" "lambda_ses_policy" {
+  name = "lambda-ses-policy"
+  role = aws_iam_role.lambda_role.id
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = ["bedrock:InvokeModel", "bedrock:*"]
-        Resource = ["arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0"]
+        Effect = "Allow"
+        Action = [
+          "ses:SendEmail",
+          "ses:SendRawEmail"
+        ]
+        Resource = "*"  # Allow sending from any verified identity
       }
     ]
   })
 }
 
-resource "aws_iam_role_policy_attachment" "bedrock_attachment" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = aws_iam_policy.bedrock_invoke_policy.arn
+# IAM policy for Lambda to publish to notification topic
+resource "aws_iam_role_policy" "lambda_notification_policy" {
+  name = "lambda-notification-policy"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sns:Publish"
+        ]
+        Resource = module.sns.notification_topic_arn
+      }
+    ]
+  })
 }
 
 # IAM policy for Lambda
@@ -187,6 +205,11 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "kendra:DescribeIndex"
         ]
         Resource = module.kendra.index_arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["bedrock:InvokeModel", "bedrock:*"]
+        Resource = ["arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0", "arn:aws:bedrock:us-east-1::inference-profile/us.amazon.nova-lite-v1:0"]
       }
     ]
   })

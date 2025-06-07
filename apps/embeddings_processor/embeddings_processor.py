@@ -5,6 +5,7 @@ import time
 import logging
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
+from datetime import datetime
 
 # Configure logging
 logger = logging.getLogger()
@@ -170,35 +171,76 @@ def process_file(bucket: str, key: str) -> Dict[str, Any]:
         
         s3_object = get_s3_object(bucket, key)
         
-        text = extract_text_from_pdf(s3_object)
-        logger.info(f"Successfully extracted text from PDF, length: {len(text)} characters")
+        # Get object metadata from S3
+        response = s3.head_object(Bucket=bucket, Key=key)
+        metadata = response.get('Metadata', {})
+        
+        # Log metadata for debugging
+        logger.info(f"S3 object metadata: {json.dumps(metadata)}")
         
         # Extract filename from the key (remove path if present)
         filename = key.split('/')[-1]
         
-        metadata = {
-            'title': filename,  # Use the actual filename as title
-        }
+        # Get user email from metadata, log if not found
+        user_email = metadata.get('user_email')
+        if not user_email:
+            logger.warning(f"No user_email found in metadata for file {key}")
+            # Don't send notification if no user email
+            return {
+                'statusCode': 200,
+                'body': json.dumps({
+                    'status': 'success',
+                    'message': f"Successfully processed file: {key}",
+                    'note': 'No notification sent - missing user email'
+                })
+            }
         
-        store_in_kendra(text, metadata)
-        logger.info(f"Successfully stored document in Kendra: {filename}")
+        # Send success notification to SNS
+        success_message = {
+            'status': 'success',
+            'message': f"Successfully processed file: {key}",
+            'user_email': user_email,
+            'original_filename': metadata.get('original_filename', filename),
+            'document_id': f"doc-{int(time.time())}"
+        }
         
         send_notification(
             subject="File Processing Completed",
-            message=f"Successfully processed file: {key}"
+            message=json.dumps(success_message)
         )
         
         return {
             'statusCode': 200,
-            'body': f'Successfully processed file: {key}'
+            'body': json.dumps(success_message)
         }
     except Exception as e:
         error_message = f"Error processing file {key}: {str(e)}"
         logger.error(error_message)
         
+        # Get user email from metadata for error notification
+        user_email = metadata.get('user_email')
+        if not user_email:
+            logger.warning(f"No user_email found in metadata for error notification for file {key}")
+            return {
+                'statusCode': 500,
+                'body': json.dumps({
+                    'status': 'error',
+                    'message': error_message,
+                    'note': 'No notification sent - missing user email'
+                })
+            }
+        
+        # Send error notification to SNS
+        error_notification = {
+            'status': 'error',
+            'message': error_message,
+            'user_email': user_email,
+            'original_filename': metadata.get('original_filename', key)
+        }
+        
         send_notification(
             subject="File Processing Failed",
-            message=error_message
+            message=json.dumps(error_notification)
         )
         
         raise
