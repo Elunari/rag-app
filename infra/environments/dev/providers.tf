@@ -28,4 +28,11 @@ terraform {
       version = "~> 3.0"
     }
   }
+  backend "s3" {
+    bucket         = "infra-dev-02"
+    key            = "global/s3/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "infra-state-lock-01"
+    encrypt        = true # Enable encryption
+  }
 }
