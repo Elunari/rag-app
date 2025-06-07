@@ -3,7 +3,6 @@ from datetime import datetime
 from typing import Dict, Any, List
 import boto3
 import uuid
-import time
 import json
 import logging
 from utils.errors import APIError
@@ -17,7 +16,7 @@ class ChatService:
         self.messages_table = self.dynamodb.Table(f"{os.environ['PROJECT_NAME']}-messages")
         self.bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
         self.kendra = boto3.client('kendra', region_name='us-east-1')
-        self.model_id = 'amazon.nova-lite-v1:0'
+        self.model_id = 'arn:aws:bedrock:us-east-1:727646510092:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0'
         self.kendra_index_id = os.environ['KENDRA_INDEX_ID']
     
     def get_chats(self, user_id: str = None) -> List[Dict[str, Any]]:
@@ -187,69 +186,67 @@ class ChatService:
         
         logger.info("CONTEXT: %s", f"{formatted_history}{context_prompt}Human: {content}\nAssistant:")
         
-        # Format messages for Nova API
-        messages = []
-        
-        # Add chat history
+        # Format messages for Claude API
+        messages_for_claude = []
         for msg in chat_history:
-            messages.append({
+            messages_for_claude.append({
                 "role": msg['role'],
-                "content": [
-                    {
-                        "text": msg['content']
-                    }
-                ]
+                "content": msg['content']
             })
         
-        try:
-            logger.info(f"Sending request to Bedrock with model {self.model_id}")
+        # Add the current user message
+        messages_for_claude.append({
+            "role": "user",
+            "content": content
+        })
 
-            inf_params = {"maxTokens": 1000, "topP": 0.1, "temperature": 0.3}
+        # Prepare the request body for Claude
+        request_body = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 1000,
+            "temperature": 0.3,
+            "top_p": 0.1,
+            "messages": messages_for_claude,
+            "system": context_prompt if context_prompt else None
+        }
 
-            response = self.bedrock.converse(
-                modelId="us.amazon.nova-lite-v1:0", 
-                messages=messages, 
-                system=[{"text": context_prompt}], 
-                inferenceConfig=inf_params,
-            )
-
-            logger.info(response)
-            
-            response_body = json.loads(response['body'].read())
-            logger.debug(f"Bedrock response: {json.dumps(response_body)}")
-            
-            # Extract the response text from Nova's response format
-            ai_message = response_body['completion'].strip()
-            
-            ai_response = {
-                'chatId': chat_id,
-                'messageId': f"msg_{now + 1}_assistant",
+        response = self.bedrock.invoke_model(
+            modelId=self.model_id,
+            body=json.dumps(request_body)
+        )
+        
+        logger.info(response)
+        
+        response_body = json.loads(response['body'].read())
+        logger.debug(f"Bedrock response: {json.dumps(response_body)}")
+        
+        # Extract the response text from Claude's response format
+        ai_message = response_body['content'][0]['text'].strip()
+        
+        ai_response = {
+            'chatId': chat_id,
+            'messageId': f"msg_{now + 1}_assistant",
+            'userId': user_id,
+            'author': 'assistant',
+            'message': ai_message,
+            'timestamp': now + 1000
+        }
+        
+        self.messages_table.put_item(Item=ai_response)
+        
+        self.table.update_item(
+            Key={
                 'userId': user_id,
-                'author': 'assistant',
-                'message': ai_message,
-                'timestamp': now + 1000
+                'chatId': chat_id
+            },
+            UpdateExpression="SET lastMessageAt = :lma, messageCount = messageCount + :inc",
+            ExpressionAttributeValues={
+                ':lma': now + 1000,
+                ':inc': 1
             }
-            
-            self.messages_table.put_item(Item=ai_response)
-            
-            self.table.update_item(
-                Key={
-                    'userId': user_id,
-                    'chatId': chat_id
-                },
-                UpdateExpression="SET lastMessageAt = :lma, messageCount = messageCount + :inc",
-                ExpressionAttributeValues={
-                    ':lma': now + 1000,
-                    ':inc': 1
-                }
-            )
-            
-            return ai_response
-            
-        except Exception as e:
-            logger.error(f"Error calling Bedrock: {str(e)}")
-            logger.error(f"Model ID: {self.model_id}")
-            raise APIError('Failed to get AI response', 500)
+        )
+        
+        return ai_response
 
     def get_messages(self, chat_id: str, user_id: str) -> List[Dict[str, Any]]:
         """Get all messages for a chat in chronological order"""
