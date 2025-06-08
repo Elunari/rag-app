@@ -9,6 +9,12 @@ from utils.response import create_response, error_response
 from utils.errors import APIError
 import cgi
 import base64
+from aws_xray_sdk.core import patcher
+from aws_xray_sdk.core import xray_recorder
+
+libraries_to_patch = ('boto3')
+patcher.patch_all()
+
 
 # Configure logging
 logger = logging.getLogger()

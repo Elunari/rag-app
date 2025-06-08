@@ -112,10 +112,8 @@ class ChatService:
             if not response.get('ResultItems'):
                 return ""
 
-            # Limit to top 3 most relevant results manually
             result_items = response['ResultItems'][:3]
 
-            # Combine the relevant passages from Kendra results
             context_parts = []
             for item in result_items:
                 title = item.get('DocumentTitle', {}).get('Text') if isinstance(item.get('DocumentTitle'), dict) else item.get('DocumentTitle', 'Untitled')
@@ -142,7 +140,7 @@ class ChatService:
         chat = self.get_chat(chat_id, user_id)
         now = int(datetime.utcnow().timestamp() * 1000)
         
-        # Store user message
+ 
         user_message = {
             'chatId': chat_id,
             'messageId': f"msg_{now}_user",
@@ -169,7 +167,6 @@ class ChatService:
 
         logger.info("QUERYING KENDRA")
 
-        # Get relevant context from Kendra
         kendra_context = self._query_kendra(content)
 
         logger.info("KENDRA content: %s", kendra_context)
@@ -181,33 +178,24 @@ class ChatService:
 
         logger.info("FORMATTED HISTORY: %s", formatted_history)
         
-        # Include Kendra context in the prompt if available
         context_prompt = f"\nHere is some relevant information that might help answer the question:\n{kendra_context}\n\n" if kendra_context else ""
         
-        logger.info("CONTEXT: %s", f"{formatted_history}{context_prompt}Human: {content}\nAssistant:")
+        logger.info("CONTEXT: %s", f"{context_prompt}")
         
-        # Format messages for Claude API
         messages_for_claude = []
         for msg in chat_history:
             messages_for_claude.append({
                 "role": msg['role'],
                 "content": msg['content']
             })
-        
-        # Add the current user message
-        messages_for_claude.append({
-            "role": "user",
-            "content": content
-        })
 
-        # Prepare the request body for Claude
         request_body = {
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": 1000,
             "temperature": 0.3,
             "top_p": 0.1,
             "messages": messages_for_claude,
-            "system": context_prompt if context_prompt else None
+            "system": context_prompt if context_prompt else ""
         }
 
         response = self.bedrock.invoke_model(
@@ -220,7 +208,7 @@ class ChatService:
         response_body = json.loads(response['body'].read())
         logger.debug(f"Bedrock response: {json.dumps(response_body)}")
         
-        # Extract the response text from Claude's response format
+
         ai_message = response_body['content'][0]['text'].strip()
         
         ai_response = {

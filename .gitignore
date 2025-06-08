@@ -4,3 +4,4 @@ infra/environments/dev/*.zip
 infra/environments/dev/terraform.tfstate
 infra/environments/dev/terraform.tfstate.backup
 terraform.tfvars
+infra/environments/dev/build/layer/python/python

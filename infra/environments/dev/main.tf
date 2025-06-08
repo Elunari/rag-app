@@ -13,6 +13,7 @@ module "api" {
   s3_bucket_name     = module.s3.bucket_name
   project_name       = "rag-chat"
   kendra_index_id    = module.kendra.index_id
+  xray_layer_arn     = aws_lambda_layer_version.xray_sdk_layer.arn
 }
 
 module "api_gateway" {
@@ -119,3 +120,11 @@ module "dynamodb" {
   environment     = "dev"
   lambda_role_arn = aws_iam_role.lambda_role.arn
 }
+data "archive_file" "xray_layer_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/build/layer/python"
+  output_path = "${path.module}/xray-layer.zip"
+
+  depends_on = [null_resource.install_xray_dependencies]
+}
+

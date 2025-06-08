@@ -32,3 +32,8 @@ variable "kendra_index_id" {
   description = "ID of the Kendra index"
   type        = string
 }
+
+variable "xray_layer_arn" {
+  description = "ARN of the X-Ray SDK Lambda layer"
+  type        = string
+}

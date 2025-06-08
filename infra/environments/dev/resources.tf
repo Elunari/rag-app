@@ -1,4 +1,4 @@
-# S3 bucket for Terraform state
+
 resource "aws_s3_bucket" "terraform_state" {
   bucket = "knowledge-base-terraform-state"
 
@@ -7,7 +7,6 @@ resource "aws_s3_bucket" "terraform_state" {
   }
 }
 
-# Enable versioning for state files
 resource "aws_s3_bucket_versioning" "terraform_state" {
   bucket = aws_s3_bucket.terraform_state.id
   versioning_configuration {
@@ -15,7 +14,6 @@ resource "aws_s3_bucket_versioning" "terraform_state" {
   }
 }
 
-# Enable server-side encryption by default
 resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" {
   bucket = aws_s3_bucket.terraform_state.id
 
@@ -26,7 +24,6 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" 
   }
 }
 
-# DynamoDB table for state locking
 resource "aws_dynamodb_table" "terraform_locks" {
   name         = "knowledge-base-terraform-locks"
   billing_mode = "PAY_PER_REQUEST"
@@ -55,7 +52,6 @@ resource "aws_iam_role" "lambda_role" {
   })
 }
 
-# IAM policy for Lambda to access S3
 resource "aws_iam_role_policy" "lambda_s3_policy" {
   name = "lambda_s3_policy"
   role = aws_iam_role.lambda_role.id
@@ -76,13 +72,11 @@ resource "aws_iam_role_policy" "lambda_s3_policy" {
   })
 }
 
-# IAM policy for Lambda to write logs
 resource "aws_iam_role_policy_attachment" "lambda_logs" {
   role       = aws_iam_role.lambda_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# IAM policy for Lambda to receive S3 events
 resource "aws_iam_role_policy" "lambda_s3_event_policy" {
   name = "lambda_s3_event_policy"
   role = aws_iam_role.lambda_role.id
@@ -105,7 +99,6 @@ resource "aws_iam_role_policy" "lambda_s3_event_policy" {
   })
 }
 
-# IAM policy for Lambda to start Step Function executions
 resource "aws_iam_role_policy" "lambda_step_functions_policy" {
   name = "lambda_step_functions_policy"
   role = aws_iam_role.lambda_role.id
@@ -118,7 +111,7 @@ resource "aws_iam_role_policy" "lambda_step_functions_policy" {
         Action = [
           "states:StartExecution"
         ]
-        Resource = "*"  # We'll restrict this to specific state machines in production
+        Resource = "*" 
       }
     ]
   })
@@ -151,7 +144,6 @@ resource "aws_iam_role_policy" "lambda_ses_policy" {
   })
 }
 
-# IAM policy for Lambda to publish to notification topic
 resource "aws_iam_role_policy" "lambda_notification_policy" {
   name = "lambda-notification-policy"
   role = aws_iam_role.lambda_role.id
@@ -170,7 +162,6 @@ resource "aws_iam_role_policy" "lambda_notification_policy" {
   })
 }
 
-# IAM policy for Lambda
 resource "aws_iam_role_policy" "lambda_policy" {
   name = "lambda-policy"
   role = aws_iam_role.lambda_role.id
@@ -258,7 +249,6 @@ resource "aws_iam_role_policy" "lambda_policy" {
   })
 }
 
-# Create IAM role for Kendra
 resource "aws_iam_role" "kendra_role" {
   provider = aws.kendra
   name = "kendra-service-role-dev"
@@ -277,7 +267,6 @@ resource "aws_iam_role" "kendra_role" {
   })
 }
 
-# Create custom policy for Kendra
 resource "aws_iam_role_policy" "kendra_policy" {
   provider = aws.kendra
   name = "kendra-service-policy"
@@ -298,6 +287,31 @@ resource "aws_iam_role_policy" "kendra_policy" {
       }
     ]
   })
+}
+
+resource "null_resource" "install_xray_dependencies" {
+  
+  triggers = {
+    requirements_md5 = filemd5("${path.module}/src/layers/xray/requirements.txt")
+  }
+
+  provisioner "local-exec" {
+    command = "mkdir -p ${path.module}/build/layer/python && pip3 install -r ${path.module}/src/layers/xray/requirements.txt -t ${path.module}/build/layer/python/python"
+  }
+}
+
+resource "aws_lambda_layer_version" "xray_sdk_layer" {
+  layer_name = "aws-xray-sdk-layer-automated"
+  
+  filename         = data.archive_file.xray_layer_zip.output_path
+  source_code_hash = data.archive_file.xray_layer_zip.output_base64sha256
+
+  compatible_runtimes = ["python3.11", "python3.12", "python3.13"]
+}
+
+resource "aws_iam_role_policy_attachment" "attachment_xray" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
 }
 
 data "aws_region" "current" {}
