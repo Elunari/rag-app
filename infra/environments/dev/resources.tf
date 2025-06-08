@@ -1,4 +1,3 @@
-
 resource "aws_s3_bucket" "terraform_state" {
   bucket = "knowledge-base-terraform-state"
 
@@ -124,7 +123,7 @@ resource "aws_lambda_permission" "api_gateway_invoke" {
   principal     = "apigateway.amazonaws.com"
 }
 
-# IAM policy for Lambda to send emails via SES
+
 resource "aws_iam_role_policy" "lambda_ses_policy" {
   name = "lambda-ses-policy"
   role = aws_iam_role.lambda_role.id
@@ -138,7 +137,7 @@ resource "aws_iam_role_policy" "lambda_ses_policy" {
           "ses:SendEmail",
           "ses:SendRawEmail"
         ]
-        Resource = "*"  # Allow sending from any verified identity
+        Resource = "*" 
       }
     ]
   })
@@ -244,6 +243,11 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "arn:aws:bedrock:*:727646510092:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0",
           "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0"
         ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = "es:ESHttp*" 
+        Resource = "arn:aws:es:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:domain/dev-knowledge-base/*"
       }
     ]
   })

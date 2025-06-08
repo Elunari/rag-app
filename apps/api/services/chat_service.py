@@ -6,6 +6,8 @@ import uuid
 import json
 import logging
 from utils.errors import APIError
+from opensearchpy import OpenSearch, RequestsHttpConnection
+from requests_aws4auth import AWS4Auth
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +17,22 @@ class ChatService:
         self.table = self.dynamodb.Table(f"{os.environ['PROJECT_NAME']}-chats")
         self.messages_table = self.dynamodb.Table(f"{os.environ['PROJECT_NAME']}-messages")
         self.bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
-        self.kendra = boto3.client('kendra', region_name='us-east-1')
         self.model_id = 'arn:aws:bedrock:us-east-1:727646510092:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0'
-        self.kendra_index_id = os.environ['KENDRA_INDEX_ID']
-    
+        
+        region = 'us-east-1'
+        service = 'es'
+        credentials = boto3.Session().get_credentials()
+        awsauth = AWS4Auth(credentials.access_key, credentials.secret_key, region, service, session_token=credentials.token)
+        
+        self.opensearch = OpenSearch(
+            hosts=[{'host': os.environ['OPENSEARCH_ENDPOINT'], 'port': 443}],
+            http_auth=awsauth,
+            use_ssl=True,
+            verify_certs=True,
+            connection_class=RequestsHttpConnection
+        )
+        self.index_name = os.environ['OPENSEARCH_INDEX']
+
     def get_chats(self, user_id: str = None) -> List[Dict[str, Any]]:
         if user_id:
             response = self.table.query(
@@ -101,37 +115,50 @@ class ChatService:
             formatted_history += f"{role}: {msg['content']}\n"
         return formatted_history
     
-    def _query_kendra(self, query: str) -> str:
-        """Query Kendra for relevant context based on the user's message."""
+    def _query_opensearch(self, query: str) -> str:
+        """Query OpenSearch for relevant context based on the user's message."""
         try:
-            response = self.kendra.query(
-                IndexId=self.kendra_index_id,
-                QueryText=query
+            # Prepare the search query
+            search_query = {
+                "size": 3,
+                "query": {
+                    "multi_match": {
+                        "query": query,
+                        "fields": ["content^2", "title"],
+                        "type": "best_fields",
+                        "tie_breaker": 0.3
+                    }
+                },
+                "_source": ["title", "content"]
+            }
+
+            # Execute the search
+            response = self.opensearch.search(
+                body=search_query,
+                index=self.index_name
             )
 
-            if not response.get('ResultItems'):
+            if not response['hits']['hits']:
                 return ""
 
-            result_items = response['ResultItems'][:3]
-
+            # Combine the relevant passages from OpenSearch results
             context_parts = []
-            for item in result_items:
-                title = item.get('DocumentTitle', {}).get('Text') if isinstance(item.get('DocumentTitle'), dict) else item.get('DocumentTitle', 'Untitled')
-                excerpt = item.get('DocumentExcerpt', {}).get('Text', '')
+            for hit in response['hits']['hits']:
+                source = hit['_source']
+                title = source.get('title', 'Untitled')
+                content = source.get('content', '')
+                score = hit['_score']
 
                 context_parts.append(
-                    f"Relevant information from document '{title}':\n{excerpt}"
+                    f"Relevant information from document '{title}' (relevance score: {score:.2f}):\n{content}"
                 )
             
-            logger.info(result_items)
-
+            logger.info(f"OpenSearch hits: {response['hits']['hits']}")
             return "\n\n".join(context_parts)
 
         except Exception as e:
-            logger.error("Error querying Kendra: %s", str(e))
+            logger.error("Error querying OpenSearch: %s", str(e))
             return ""
-
-
 
     def send_message(self, chat_id: str, content: str, user_id: str = None, role: str = 'user') -> Dict[str, Any]:
         if not user_id:
@@ -140,7 +167,6 @@ class ChatService:
         chat = self.get_chat(chat_id, user_id)
         now = int(datetime.utcnow().timestamp() * 1000)
         
- 
         user_message = {
             'chatId': chat_id,
             'messageId': f"msg_{now}_user",
@@ -165,21 +191,16 @@ class ChatService:
             }
         )
 
-        logger.info("QUERYING KENDRA")
-
-        kendra_context = self._query_kendra(content)
-
-        logger.info("KENDRA content: %s", kendra_context)
+        logger.info("QUERYING OPENSEARCH")
+        opensearch_context = self._query_opensearch(content)
+        logger.info("OPENSEARCH content: %s", opensearch_context)
 
         chat_history = self._get_chat_history(chat_id)
-
         logger.info("CHAT HISTORY: %s", chat_history)
         formatted_history = self._format_chat_history(chat_history)
-
         logger.info("FORMATTED HISTORY: %s", formatted_history)
         
-        context_prompt = f"\nHere is some relevant information that might help answer the question:\n{kendra_context}\n\n" if kendra_context else ""
-        
+        context_prompt = f"\nHere is some relevant information that might help answer the question:\n{opensearch_context}\n\n" if opensearch_context else ""
         logger.info("CONTEXT: %s", f"{context_prompt}")
         
         messages_for_claude = []
@@ -208,7 +229,6 @@ class ChatService:
         response_body = json.loads(response['body'].read())
         logger.debug(f"Bedrock response: {json.dumps(response_body)}")
         
-
         ai_message = response_body['content'][0]['text'].strip()
         
         ai_response = {

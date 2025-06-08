@@ -6,6 +6,8 @@ import logging
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from datetime import datetime
+from opensearchpy import OpenSearch, RequestsHttpConnection
+from requests_aws4auth import AWS4Auth
 
 # Configure logging
 logger = logging.getLogger()
@@ -25,10 +27,82 @@ s3 = boto3.client('s3')
 sns = boto3.client('sns')
 textract = boto3.client('textract')
 bedrock = boto3.client('bedrock-runtime')
-kendra = boto3.client('kendra', region_name='us-east-1')
 
-kendra_index_id = os.environ['KENDRA_INDEX_ID']
-logger.info(f"Using Kendra index ID: {kendra_index_id}")
+# OpenSearch configuration
+opensearch_endpoint = os.environ['OPENSEARCH_ENDPOINT']
+opensearch_index = os.environ['OPENSEARCH_INDEX']
+region = os.environ['AWS_REGION']
+
+# Create OpenSearch client with AWS authentication
+credentials = boto3.Session().get_credentials()
+auth = AWS4Auth(
+    credentials.access_key,
+    credentials.secret_key,
+    region,
+    'es',
+    session_token=credentials.token
+)
+
+opensearch = OpenSearch(
+    hosts=[{'host': opensearch_endpoint.replace('https://', ''), 'port': 443}],
+    http_auth=auth,
+    use_ssl=True,
+    verify_certs=True,
+    connection_class=RequestsHttpConnection
+)
+
+def create_opensearch_index():
+    """Create OpenSearch index with vector search mapping if it doesn't exist."""
+    try:
+        # Check if index exists
+        if not opensearch.indices.exists(index=opensearch_index):
+            logger.info(f"Creating OpenSearch index: {opensearch_index}")
+            
+            # Define index mapping
+            mapping = {
+                "mappings": {
+                    "properties": {
+                        "id": { "type": "keyword" },
+                        "title": { "type": "text" },
+                        "content": { "type": "text" },
+                        "embeddings": {
+                            "type": "knn_vector",
+                            "dimension": 1536,
+                            "method": {
+                                "name": "hnsw",
+                                "space_type": "l2",
+                                "engine": "nmslib"
+                            }
+                        },
+                        "metadata": { "type": "object" },
+                        "timestamp": { "type": "date" }
+                    }
+                },
+                "settings": {
+                    "index": {
+                        "knn": True,
+                        "knn.algo_param.ef_search": 100,
+                        "knn.algo_param.ef_construction": 200,
+                        "knn.algo_param.m": 16
+                    }
+                }
+            }
+            
+            # Create index with mapping
+            response = opensearch.indices.create(
+                index=opensearch_index,
+                body=mapping
+            )
+            logger.info(f"Created OpenSearch index: {json.dumps(response)}")
+        else:
+            logger.info(f"OpenSearch index {opensearch_index} already exists")
+            
+    except Exception as e:
+        logger.error(f"Error creating OpenSearch index: {str(e)}")
+        raise
+
+# Create index when Lambda starts
+create_opensearch_index()
 
 @dataclass
 class S3Object:
@@ -119,33 +193,56 @@ def extract_text_from_pdf(s3_object: S3Object) -> str:
         logger.error(f"Error extracting text with Textract: {str(e)}")
         raise
 
-def store_in_kendra(text: str, metadata: Dict[str, Any]) -> None:
-    """Store text in Amazon Kendra."""
+def generate_embeddings(text: str) -> List[float]:
+    """Generate embeddings using Amazon Titan."""
+    try:
+        logger.info("Generating embeddings with Titan")
+        response = bedrock.invoke_model(
+            modelId='amazon.titan-embed-text-v1',
+            body=json.dumps({
+                'inputText': text
+            })
+        )
+        
+        response_body = json.loads(response['body'].read())
+        embeddings = response_body['embedding']
+        logger.info(f"Successfully generated embeddings of length: {len(embeddings)}")
+        return embeddings
+    except Exception as e:
+        logger.error(f"Error generating embeddings: {str(e)}")
+        raise
+
+def store_in_opensearch(text: str, embeddings: List[float], metadata: Dict[str, Any]) -> None:
+    """Store text and embeddings in OpenSearch."""
     try:
         # Create a unique document ID using timestamp
         document_id = f"doc-{int(time.time())}"
-        logger.info(f"Preparing to store document in Kendra with ID: {document_id}")
+        logger.info(f"Preparing to store document in OpenSearch with ID: {document_id}")
         
-        # Prepare the document for Kendra
+        # Prepare the document for OpenSearch
         document = {
-            'Id': document_id,
-            'Title': metadata.get('title', 'Untitled Document'),
-            'Blob': text.encode('utf-8')
+            'id': document_id,
+            'title': metadata.get('title', 'Untitled Document'),
+            'content': text,
+            'embeddings': embeddings,
+            'metadata': metadata,
+            'timestamp': datetime.utcnow().isoformat()
         }
         
-        logger.info(f"Submitting document to Kendra index {kendra_index_id}")
-        logger.info(f"Document details: Title={document['Title']}, Size={len(text)} bytes")
+        logger.info(f"Submitting document to OpenSearch index {opensearch_index}")
+        logger.info(f"Document details: Title={document['title']}, Size={len(text)} bytes")
         
-        # Submit the document to Kendra
-        response = kendra.batch_put_document(
-            IndexId=kendra_index_id,
-            Documents=[document]
+        # Submit the document to OpenSearch
+        response = opensearch.index(
+            index=opensearch_index,
+            id=document_id,
+            body=document
         )
         
-        logger.info(f"Kendra batch_put_document response: {json.dumps(response)}")
+        logger.info(f"OpenSearch index response: {json.dumps(response)}")
             
     except Exception as e:
-        logger.error(f"Error storing in Kendra: {str(e)}")
+        logger.error(f"Error storing in OpenSearch: {str(e)}")
         raise
 
 def send_notification(subject: str, message: str) -> None:
@@ -161,7 +258,7 @@ def send_notification(subject: str, message: str) -> None:
         logger.error(f"Error sending notification: {str(e)}")
 
 def process_file(bucket: str, key: str) -> Dict[str, Any]:
-    """Process a single file: extract text and store in Kendra."""
+    """Process a single file: extract text, generate embeddings, and store in OpenSearch."""
     try:
         logger.info(f"Starting to process file: {key} from bucket: {bucket}")
         send_notification(
@@ -198,8 +295,12 @@ def process_file(bucket: str, key: str) -> Dict[str, Any]:
                 })
             }
         
-        store_in_kendra(text, metadata)
-        logger.info(f"Successfully stored document in Kendra: {filename}")
+        # Generate embeddings
+        embeddings = generate_embeddings(text)
+        
+        # Store in OpenSearch
+        store_in_opensearch(text, embeddings, metadata)
+        logger.info(f"Successfully stored document in OpenSearch: {filename}")
 
         # Send success notification to SNS
         success_message = {

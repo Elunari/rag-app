@@ -24,4 +24,10 @@ variable "aws_region" {
 variable "ses_sender_email" {
   description = "Email address to use as the sender for SES notifications"
   type        = string
+}
+
+variable "opensearch_master_password" {
+  description = "Master password for OpenSearch domain"
+  type        = string
+  sensitive   = true
 } 

@@ -1,1 +1,4 @@
-boto3==1.34.34 
+boto3==1.34.34
+aws-xray-sdk
+opensearch-py==2.3.2
+requests-aws4auth==1.2.3 

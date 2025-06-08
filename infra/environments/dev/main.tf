@@ -14,6 +14,8 @@ module "api" {
   project_name       = "rag-chat"
   kendra_index_id    = module.kendra.index_id
   xray_layer_arn     = aws_lambda_layer_version.xray_sdk_layer.arn
+  opensearch_endpoint = module.opensearch.domain_endpoint
+  opensearch_index   = module.opensearch.index_name
 }
 
 module "api_gateway" {
@@ -91,6 +93,10 @@ module "embeddings_processor" {
   notification_topic_arn = module.sns.notification_topic_arn
   kendra_index_id    = module.kendra.index_id
   s3_bucket_name     = module.s3.bucket_name
+  environment        = "dev"
+  opensearch_endpoint = module.opensearch.domain_endpoint
+  opensearch_index   = module.opensearch.index_name
+  xray_layer_arn     = aws_lambda_layer_version.xray_sdk_layer.arn
 }
 
 module "cognito" {
@@ -120,6 +126,18 @@ module "dynamodb" {
   environment     = "dev"
   lambda_role_arn = aws_iam_role.lambda_role.arn
 }
+
+module "opensearch" {
+  source = "../../modules/opensearch"
+
+  environment      = "dev"
+  project_name     = "rag-chat"
+  lambda_role_arn  = aws_iam_role.lambda_role.arn
+  lambda_role_id   = aws_iam_role.lambda_role.id
+  master_username  = "admin"
+  master_password  = var.opensearch_master_password
+}
+
 data "archive_file" "xray_layer_zip" {
   type        = "zip"
   source_dir  = "${path.module}/build/layer/python"
