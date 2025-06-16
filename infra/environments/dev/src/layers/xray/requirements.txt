@@ -1,1 +1,1 @@
-aws-xray-sdk==2.14.0
+aws-xray-sdk

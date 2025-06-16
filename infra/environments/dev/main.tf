@@ -1,8 +1,10 @@
+# S3 bucket for storing documents and other assets
 module "s3" {
   source      = "../../modules/s3"
   environment = "dev"
 }
 
+# Main API Lambda function for handling chat and knowledge base operations
 module "api" {
   source = "../../modules/api"
 
@@ -14,8 +16,10 @@ module "api" {
   project_name       = "rag-chat"
   kendra_index_id    = module.kendra.index_id
   xray_layer_arn     = aws_lambda_layer_version.xray_sdk_layer.arn
+  cognito_user_pool_id = module.cognito.user_pool_id
 }
 
+# API Gateway for exposing the API endpoints
 module "api_gateway" {
   source = "../../modules/api_gateway"
 
@@ -28,6 +32,7 @@ module "api_gateway" {
   aws_region          = var.aws_region
 }
 
+# Lambda function triggered by S3 uploads to initiate document processing
 module "s3_trigger_lambda" {
   source = "../../modules/s3_trigger_lambda"
   
@@ -41,12 +46,14 @@ module "s3_trigger_lambda" {
   queue_url          = module.sqs.queue_url
 }
 
+# SQS queue for managing document processing tasks
 module "sqs" {
   source = "../../modules/sqs"
   
   queue_name = "file-processing-queue-dev"
 }
 
+# Lambda function for handling notifications about document processing status
 module "notification_handler" {
   source = "../../modules/notification_handler"
   
@@ -57,6 +64,7 @@ module "notification_handler" {
   lambda_role_arn   = aws_iam_role.lambda_role.arn
 }
 
+# SNS topic for sending notifications about document processing
 module "sns" {
   source = "../../modules/sns"
   
@@ -69,6 +77,7 @@ module "sns" {
   notification_handler_lambda_arn = module.notification_handler.lambda_function_arn
 }
 
+# Kendra search index for storing and searching processed documents
 module "kendra" {
   source = "../../modules/kendra"
 
@@ -79,6 +88,7 @@ module "kendra" {
   kms_key_id       = null  # Using AWS managed key
 }
 
+# Lambda function for processing documents and storing them in Kendra
 module "embeddings_processor" {
   source = "../../modules/embeddings_processor"
   
@@ -93,6 +103,7 @@ module "embeddings_processor" {
   s3_bucket_name     = module.s3.bucket_name
 }
 
+# Cognito user pool for authentication and user management
 module "cognito" {
   source = "../../modules/cognito"
 
@@ -100,6 +111,7 @@ module "cognito" {
   app_domain     = "master.djhjyu4g8gyz0.amplifyapp.com"
 }
 
+# Amplify app for hosting the frontend
 module "amplify" {
   source = "../../modules/amplify"
 
@@ -113,6 +125,7 @@ module "amplify" {
   user_pool_client_id = module.cognito.user_pool_client_id
 }
 
+# DynamoDB tables for storing chat and message data
 module "dynamodb" {
   source = "../../modules/dynamodb"
 
@@ -120,6 +133,8 @@ module "dynamodb" {
   environment     = "dev"
   lambda_role_arn = aws_iam_role.lambda_role.arn
 }
+
+# Create ZIP archive for X-Ray SDK Lambda layer
 data "archive_file" "xray_layer_zip" {
   type        = "zip"
   source_dir  = "${path.module}/build/layer/python"

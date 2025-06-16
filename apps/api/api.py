@@ -12,16 +12,28 @@ import base64
 from aws_xray_sdk.core import patcher
 from aws_xray_sdk.core import xray_recorder
 
+# Patch boto3 for X-Ray tracing
 libraries_to_patch = ('boto3')
 patcher.patch_all()
-
 
 # Configure logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 def get_user_id(event: Dict[str, Any]) -> str:
-    """Extract user ID from the event"""
+    """
+    Extract user ID from the Cognito JWT token in the event.
+    This is used for authentication and authorization.
+    
+    Args:
+        event: Lambda event containing request context and authorizer claims
+        
+    Returns:
+        str: User ID from Cognito
+        
+    Raises:
+        APIError: If user is not authenticated
+    """
     claims = event.get('requestContext', {}).get('authorizer', {}).get('claims', {})
     user_id = claims.get('sub')
     if not user_id:
@@ -29,7 +41,16 @@ def get_user_id(event: Dict[str, Any]) -> str:
     return user_id
 
 def get_user_email(event: Dict[str, Any]) -> str:
-    """Extract user email from the event"""
+    """
+    Extract user email from the Cognito JWT token.
+    Used for notifications and document ownership.
+    
+    Args:
+        event: Lambda event containing request context and authorizer claims
+        
+    Returns:
+        str: User email or None if not found
+    """
     claims = event.get('requestContext', {}).get('authorizer', {}).get('claims', {})
     email = claims.get('email')
     if not email:
@@ -37,7 +58,23 @@ def get_user_email(event: Dict[str, Any]) -> str:
     return email
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """Main Lambda handler function"""
+    """
+    Main Lambda handler function that routes requests to appropriate handlers.
+    Implements the following endpoints:
+    - GET /chats - List user's chats
+    - GET /chats/{chatId} - Get specific chat
+    - POST /chats/{chatName} - Create new chat
+    - GET /chats/{chatId}/messages - Get chat messages
+    - POST /chats/{chatId}/messages - Send message
+    - POST /add_to_knowledge_base - Upload document
+    
+    Args:
+        event: Lambda event containing HTTP request details
+        context: Lambda context
+        
+    Returns:
+        Dict: API response with status code and body
+    """
     try:
         logger.info(f"Received event: {json.dumps(event)}")
         
@@ -52,6 +89,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         chat_service = ChatService()
         kb_service = KnowledgeBaseService()
         
+        # Authenticate user for protected routes
         user_id = None
         user_email = None
         if path.startswith('chats') or path == 'add_to_knowledge_base':
@@ -63,6 +101,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 logger.error(f"Authentication error: {str(e)}")
                 raise
         
+        # Route handling
         if path == 'chats' and http_method == 'GET':
             logger.info("Handling GET /chats request")
             chats = chat_service.get_chats(user_id)

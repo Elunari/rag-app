@@ -1,14 +1,24 @@
+# HTTP API Gateway for exposing the Lambda function endpoints
 resource "aws_apigatewayv2_api" "api" {
   name          = "lambda-api"
   protocol_type = "HTTP"
   cors_configuration {
     allow_origins = ["*"]  # In production, you should restrict this to your Amplify domain
     allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    allow_headers = ["Content-Type", "Authorization", "X-Amz-Date", "X-Api-Key", "X-Amz-Security-Token"]
-    max_age       = 300
+    allow_headers = [
+      "Content-Type",
+      "Authorization",
+      "X-Amz-Date",
+      "X-Api-Key",
+      "X-Amz-Security-Token",
+      "X-Requested-With"
+    ]
+    expose_headers = ["*"]
+    max_age       = 300  # Cache preflight requests for 5 minutes
   }
 }
 
+# Cognito JWT authorizer for securing API endpoints
 resource "aws_apigatewayv2_authorizer" "cognito_authorizer" {
   api_id           = aws_apigatewayv2_api.api.id
   authorizer_type  = "JWT"
@@ -21,13 +31,15 @@ resource "aws_apigatewayv2_authorizer" "cognito_authorizer" {
   }
 }
 
+# Lambda integration for handling API requests
 resource "aws_apigatewayv2_integration" "lambda_integration" {
   api_id           = aws_apigatewayv2_api.api.id
   integration_type = "AWS_PROXY"
   integration_uri  = var.lambda_invoke_arn
 }
 
-# Chat routes
+# Chat Management Routes
+# List all chats for the authenticated user
 resource "aws_apigatewayv2_route" "list_chats" {
   api_id             = aws_apigatewayv2_api.api.id
   route_key          = "GET /chats"
@@ -36,6 +48,7 @@ resource "aws_apigatewayv2_route" "list_chats" {
   authorizer_id      = aws_apigatewayv2_authorizer.cognito_authorizer.id
 }
 
+# Create a new chat with the given name
 resource "aws_apigatewayv2_route" "create_chat" {
   api_id             = aws_apigatewayv2_api.api.id
   route_key          = "POST /chats/{chatName}"
@@ -44,6 +57,7 @@ resource "aws_apigatewayv2_route" "create_chat" {
   authorizer_id      = aws_apigatewayv2_authorizer.cognito_authorizer.id
 }
 
+# Get details of a specific chat
 resource "aws_apigatewayv2_route" "get_chat" {
   api_id             = aws_apigatewayv2_api.api.id
   route_key          = "GET /chats/{chatId}"
@@ -52,6 +66,7 @@ resource "aws_apigatewayv2_route" "get_chat" {
   authorizer_id      = aws_apigatewayv2_authorizer.cognito_authorizer.id
 }
 
+# Send a message in a chat
 resource "aws_apigatewayv2_route" "send_message" {
   api_id             = aws_apigatewayv2_api.api.id
   route_key          = "POST /chats/{chatId}/messages"
@@ -60,6 +75,7 @@ resource "aws_apigatewayv2_route" "send_message" {
   authorizer_id      = aws_apigatewayv2_authorizer.cognito_authorizer.id
 }
 
+# Get all messages in a chat
 resource "aws_apigatewayv2_route" "get_messages" {
   api_id             = aws_apigatewayv2_api.api.id
   route_key          = "GET /chats/{chatId}/messages"
@@ -68,7 +84,8 @@ resource "aws_apigatewayv2_route" "get_messages" {
   authorizer_id      = aws_apigatewayv2_authorizer.cognito_authorizer.id
 }
 
-# Knowledge base route
+# Knowledge Base Management Route
+# Upload a document to the knowledge base
 resource "aws_apigatewayv2_route" "add_to_knowledge_base" {
   api_id             = aws_apigatewayv2_api.api.id
   route_key          = "POST /add_to_knowledge_base"
@@ -77,16 +94,19 @@ resource "aws_apigatewayv2_route" "add_to_knowledge_base" {
   authorizer_id      = aws_apigatewayv2_authorizer.cognito_authorizer.id
 }
 
+# API Gateway stage for deployment
 resource "aws_apigatewayv2_stage" "api_stage" {
   api_id      = aws_apigatewayv2_api.api.id
-  name        = "$default"
-  auto_deploy = true
+  name        = "$default"  # Default stage for HTTP APIs
+  auto_deploy = true  # Automatically deploy changes
 }
 
+# Output the API endpoint URL
 output "api_url" {
   value = aws_apigatewayv2_api.api.api_endpoint
 }
 
+# IAM permission to allow API Gateway to invoke the Lambda function
 resource "aws_lambda_permission" "api_gw" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"

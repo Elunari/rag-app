@@ -32,12 +32,33 @@ logger.info(f"Using Kendra index ID: {kendra_index_id}")
 
 @dataclass
 class S3Object:
+    """
+    Data class representing an S3 object with its metadata.
+    Used to pass S3 object information between functions.
+    
+    Attributes:
+        bucket: S3 bucket name
+        key: S3 object key
+        content_type: MIME type of the object (optional)
+    """
     bucket: str
     key: str
     content_type: Optional[str] = None
 
 def get_s3_object(bucket: str, key: str) -> S3Object:
-    """Retrieve S3 object metadata."""
+    """
+    Retrieve metadata for an S3 object.
+    
+    Args:
+        bucket: S3 bucket name
+        key: S3 object key
+        
+    Returns:
+        S3Object: Object containing bucket, key, and content type
+        
+    Raises:
+        Exception: If S3 head_object fails
+    """
     try:
         logger.info(f"Getting S3 object metadata for bucket: {bucket}, key: {key}")
         response = s3.head_object(Bucket=bucket, Key=key)
@@ -51,13 +72,34 @@ def get_s3_object(bucket: str, key: str) -> S3Object:
         raise
 
 def is_pdf(content_type: Optional[str]) -> bool:
-    """Check if the file is a PDF based on content type."""
+    """
+    Check if a file is a PDF based on its content type.
+    
+    Args:
+        content_type: MIME type of the file
+        
+    Returns:
+        bool: True if file is a PDF, False otherwise
+    """
     is_pdf_file = content_type == 'application/pdf'
     logger.info(f"File content type: {content_type}, is PDF: {is_pdf_file}")
     return is_pdf_file
 
 def extract_text_from_pdf(s3_object: S3Object) -> str:
-    """Extract text from PDF document using Amazon Textract."""
+    """
+    Extract text from a PDF document using Amazon Textract.
+    Uses asynchronous document analysis to handle large PDFs.
+    
+    Args:
+        s3_object: S3Object containing PDF file information
+        
+    Returns:
+        str: Extracted text from the PDF
+        
+    Raises:
+        ValueError: If file is not a PDF
+        Exception: If Textract job fails
+    """
     if not is_pdf(s3_object.content_type):
         raise ValueError(f"File {s3_object.key} is not a PDF. Content type: {s3_object.content_type}")
     
@@ -76,6 +118,7 @@ def extract_text_from_pdf(s3_object: S3Object) -> str:
         job_id = response['JobId']
         logger.info(f"Textract job started with ID: {job_id}")
         
+        # Poll for job completion
         while True:
             response = textract.get_document_analysis(JobId=job_id)
             status = response['JobStatus']
@@ -91,6 +134,7 @@ def extract_text_from_pdf(s3_object: S3Object) -> str:
             logger.error(error_msg)
             raise Exception(error_msg)
         
+        # Collect all text blocks
         text_blocks = []
         next_token = None
         
@@ -120,7 +164,17 @@ def extract_text_from_pdf(s3_object: S3Object) -> str:
         raise
 
 def store_in_kendra(text: str, metadata: Dict[str, Any]) -> None:
-    """Store text in Amazon Kendra."""
+    """
+    Store extracted text in Amazon Kendra index.
+    Creates a unique document ID using timestamp.
+    
+    Args:
+        text: Extracted text to store
+        metadata: Document metadata including title
+        
+    Raises:
+        Exception: If Kendra batch_put_document fails
+    """
     try:
         # Create a unique document ID using timestamp
         document_id = f"doc-{int(time.time())}"
@@ -149,7 +203,17 @@ def store_in_kendra(text: str, metadata: Dict[str, Any]) -> None:
         raise
 
 def send_notification(subject: str, message: str) -> None:
-    """Send a notification to SNS topic."""
+    """
+    Send a notification to SNS topic.
+    Used to notify users about document processing status.
+    
+    Args:
+        subject: Email subject
+        message: Email message body
+        
+    Raises:
+        Exception: If SNS publish fails
+    """
     try:
         logger.info(f"Sending notification: {subject}")
         sns.publish(
@@ -161,7 +225,23 @@ def send_notification(subject: str, message: str) -> None:
         logger.error(f"Error sending notification: {str(e)}")
 
 def process_file(bucket: str, key: str) -> Dict[str, Any]:
-    """Process a single file: extract text and store in Kendra."""
+    """
+    Process a single file: extract text and store in Kendra.
+    Main processing function that orchestrates the workflow:
+    1. Extract text from PDF using Textract
+    2. Store text in Kendra
+    3. Send notifications about processing status
+    
+    Args:
+        bucket: S3 bucket name
+        key: S3 object key
+        
+    Returns:
+        Dict: Processing status and message
+        
+    Raises:
+        Exception: If any step in the process fails
+    """
     try:
         logger.info(f"Starting to process file: {key} from bucket: {bucket}")
         send_notification(
