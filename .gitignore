@@ -5,3 +5,8 @@ infra/environments/dev/terraform.tfstate
 infra/environments/dev/terraform.tfstate.backup
 terraform.tfvars
 infra/environments/dev/build/layer/python/python
+apps/api/__pycache__
+apps/api/services/__pycache__
+apps/api/utils/__pycache__
+apps/api/venv
+apps/embeddings_processor/__pycache__
