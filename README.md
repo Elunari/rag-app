@@ -119,6 +119,8 @@ Required environment variables for terraform:
 - `GITHUB_TOKEN`
 - `REPOSITORY_URL`
 
+The variables example is stored in `terraform.tfvars.example`. It needs to be filled with real data, in file called `terraform.tfvars` in same directory.
+
 Required environment variables for frontend:
 
 - `REACT_APP_BACKEND_URL`
