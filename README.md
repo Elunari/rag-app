@@ -43,7 +43,7 @@ A Retrieval-Augmented Generation (RAG) application that uses AWS services to pro
 
 - FastAPI-based Lambda function
 - Handles chat and document management
-- Integrates with OpenSearch for retrieval
+- Integrates with Kendra for retrieval
 - Uses Cognito for authentication
 
 #### Frontend (`/apps/frontend`)
