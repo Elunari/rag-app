@@ -11,9 +11,7 @@ resource "aws_apigatewayv2_api" "api" {
       "X-Amz-Date",
       "X-Api-Key",
       "X-Amz-Security-Token",
-      "X-Requested-With"
     ]
-    expose_headers = ["*"]
     max_age       = 300  # Cache preflight requests for 5 minutes
   }
 }

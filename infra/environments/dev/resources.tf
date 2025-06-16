@@ -245,32 +245,6 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0"
         ]
       },
-      {
-        Effect   = "Allow"
-        Action   = "es:ESHttp*" 
-        Resource = "arn:aws:es:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:domain/dev-knowledge-base/*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "execute-api:Invoke",
-          "execute-api:ManageConnections"
-        ]
-        Resource = [
-          "arn:aws:execute-api:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:*/*/*/*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "cognito-idp:AdminInitiateAuth",
-          "cognito-idp:AdminGetUser",
-          "cognito-idp:AdminUserGlobalSignOut"
-        ]
-        Resource = [
-          "arn:aws:cognito-idp:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:userpool/${module.cognito.user_pool_id}"
-        ]
-      }
     ]
   })
 }

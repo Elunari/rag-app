@@ -37,8 +37,3 @@ variable "xray_layer_arn" {
   description = "ARN of the X-Ray SDK Lambda layer"
   type        = string
 }
-
-variable "cognito_user_pool_id" {
-  description = "ID of the Cognito User Pool"
-  type        = string
-}
