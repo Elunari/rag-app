@@ -3,10 +3,10 @@ import io
 import logging
 from typing import Dict, Any
 
-from services.chat_service import ChatService
-from services.knowledge_base_service import KnowledgeBaseService
-from utils.response import create_response, error_response
-from utils.errors import APIError
+from apps.api.services.chat_service import ChatService
+from apps.api.services.knowledge_base_service import KnowledgeBaseService
+from apps.api.utils.response import create_response, error_response
+from apps.api.utils.errors import APIError
 import cgi
 import base64
 from aws_xray_sdk.core import patcher
@@ -66,7 +66,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     - POST /chats/{chatName} - Create new chat
     - GET /chats/{chatId}/messages - Get chat messages
     - POST /chats/{chatId}/messages - Send message
-    - POST /add_to_knowledge_base - Upload document
+    - POST /add_to_knowledge_base - Upload document with knowledge
     
     Args:
         event: Lambda event containing HTTP request details
